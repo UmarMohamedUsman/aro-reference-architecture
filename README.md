@@ -1,4 +1,7 @@
 # ARO Reference Architecture
+
+![Architectural diagram for the secure baseline scenario.](./ArchitectureDiagram/Reference_Architecture.png)
+
 This repo is for building Azure Red Hat OpenShift reference archtiecture and to integrate with other Azure Service
 
 Currently we’ve no reference architectures in Azure Architecture Center for deploying Azure Red Hat OpenShift (ARO) and integrating with various Azure Services. This is been a  pain point for customers looking to deploy ARO following Microsoft recommended best practices and continue to hinder ARO adoption.
