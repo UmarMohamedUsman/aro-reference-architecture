@@ -168,11 +168,27 @@ az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c $aro_
 # target_registries_fqdns="$LOCATION.data.mcr.microsoft.com $acr_name.azurecr.io *.gcr.io gcr.io storage.googleapis.com *.docker.io quay.io *.quay.io *.cloudfront.net production.cloudflare.docker.com *.hcp.$location.cx.aks.containerservice.azure.us"
 # target_fqdns="grafana.net grafana.com stats.grafana.org github.com raw.githubusercontent.com security.ubuntu.com security.ubuntu.com packages.microsoft.com azure.archive.ubuntu.com security.ubuntu.com hack32003.vault.azure.net *.letsencrypt.org usage.projectcalico.org gov-prod-policy-data.trafficmanager.net vortex.data.microsoft.com"
 
-# 6. Bastion Host
+# 6. Update VNET DNS IP
+az network vnet update -g $HUBRGNAME -n $HUBVNET_NAME --dns-servers $azfw_private_ip
+az network vnet update -g $HUBRGNAME -n $SPOKEVNET_NAME --dns-servers $azfw_private_ip
+
+# 7. Create UDRs
+# 7.1 UDR for ARO
+ARO_UDR_NAME='aro-udr'
+az network route-table create -n $ARO_UDR_NAME -g $HUBRGNAME -l $LOCATION
+az network route-table route create -n defaultRoute --route-table-name $ARO_UDR_NAME -g $HUBRGNAME \
+    --next-hop-type VirtualAppliance --address-prefix "0.0.0.0/0" --next-hop-ip-address $azfw_private_ip
+aro_rt_id=$(az network route-table show -n $ARO_UDR_NAME -g $HUBRGNAME -o tsv --query id)
+az network vnet subnet update -g $SPOKERGNAME --vnet-name $SPOKEVNET_NAME -n master-aro-subnet --route-table $aro_rt_id
+az network vnet subnet update -g $SPOKERGNAME --vnet-name $SPOKEVNET_NAME -n worker-aro-subnet --route-table $aro_rt_id
+
+# 7.2 TODO: UDR for VMs/Toolsbox and PrivateRunner
+
+# 8. Bastion Host
 az network public-ip create -g $HUBRGNAME -n $BASTION_NAME'-PIP' --sku Standard --location $LOCATION
 az network bastion create --name $BASTION_NAME --public-ip-address $BASTION_NAME'-PIP' -g $HUBRGNAME --vnet-name $HUBVNET_NAME --location $LOCATION
 
-# 7. Tools Box (for troubleshooting)
+# 9. Tools Box (for troubleshooting)
 az vm create \
   --name 'ToolsBox' \
   --resource-group $HUBRGNAME \
@@ -183,7 +199,7 @@ az vm create \
   --subnet VM-Subnet \
   --generate-ssh-keys
 
-# 8. ACR in Spoke VNET with Private Endpoint
+# 10. ACR in Spoke VNET with Private Endpoint
 az acr create --resource-group $SPOKERGNAME --name $ACR_NAME --sku Standard --public-network-enabled false
 
 az network private-dns zone create \
@@ -194,7 +210,7 @@ az network private-dns link vnet create \
   --resource-group $SPOKERGNAME \
   --zone-name "privatelink.azurecr.io" \
   --name AcrDNSLink \
-  --virtual-network $SPOKEVNET_NAME \
+  --virtual-network $HUBVNET_NAME \
   --registration-enabled false
 
 REGISTRY_ID=$(az acr show --name $ACR_NAME \
@@ -209,8 +225,30 @@ az network private-endpoint create \
     --group-ids registry \
     --connection-name acrConnection
 
+az network private-endpoint dns-zone-group create \
+    --name ACR-ZoneGroup \
+    --resource-group $SPOKERGNAME \
+    --endpoint-name acrPvtEndpoint \
+    --private-dns-zone "privatelink.azurecr.io" \
+    --zone-name ACR
 
-# 8. Create private ARO cluster
+# 11. Create Azure Application Gateway
+APPGW_NAME=aro-app-gw
+APPGW_SKU=WAF_v2
+az network public-ip create \
+  --resource-group $SPOKERGNAME \
+  --name $APPGW_NAME'-pip' \
+  --sku Standard \
+  -l $LOCATION
+appgw_ip=$(az network public-ip show -g $SPOKERGNAME -n $APPGW_NAME --query ipAddress -o tsv)
+az network application-gateway create -g $SPOKERGNAME -n $APPGW_NAME -l $LOCATION \
+          --capacity 2 --sku $APPGW_SKU --frontend-port 80 \
+          --routing-rule-type basic --http-settings-port 80 \
+          --http-settings-protocol Http --public-ip-address $APPGW_NAME'-pip' \
+          --vnet-name $SPOKEVNET_NAME --subnet AppGW-subnet \
+          --servers "dummy.abc.com" --no-wait
+
+# 12. Create private ARO cluster
 az aro create \
   --resource-group $RGNAME \
   --name $AROCLUSTER \
@@ -222,18 +260,18 @@ az aro create \
   --pull-secret $PULLSECRETLOCATION
   # --domain foo.example.com # [OPTIONAL] custom domain
 
-# 9. Connect to ARO cluster
+# 13. Connect to ARO cluster
 az aro list-credentials \
   --name $AROCLUSTER \
   --resource-group $RGNAME
 
-# 10. Find the ARO cluster console URL and browse using your browser
+# 14. Find the ARO cluster console URL and browse using your browser
 az aro show \
     --name $AROCLUSTER \
     --resource-group $RGNAME \
     --query "consoleProfile.url" -o tsv
 
-# 11. Download the latest OpenShift 4 CLI for Linux.
+# 15. Download the latest OpenShift 4 CLI for Linux.
 cd ~
 wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
 
@@ -241,11 +279,11 @@ mkdir openshift
 tar -zxvf openshift-client-linux.tar.gz -C openshift
 echo 'export PATH=$PATH:~/openshift' >> ~/.bashrc && source ~/.bashrc
 
-# 12. Connect using the OpenShift CLI
+# 16. Connect using the OpenShift CLI
 apiServer=$(az aro show -g $RGNAME -n $AROCLUSTER --query apiserverProfile.url -o tsv)
 
-# 13. Login to the OpenShift cluster's API server
+# 17. Login to the OpenShift cluster's API server
 oc login $apiServer -u kubeadmin -p "He3GZ-mnpLA-vmgoZ-PMVvU"
 
-# 14. To display all namespaces
+# 18. To display all namespaces
 oc get ns
