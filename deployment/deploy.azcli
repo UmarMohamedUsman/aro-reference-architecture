@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 
 
-HUBRGName=hub-rg
-SPOKERGNAME=spoke-rg
-AZFW_NAME=azfw
-BASTION_NAME=bastion-hub
-LOCATION=westus
-AROCLUSTER=ftaarocluster                 # the name of your ARO cluster
+HUBRGNAME='hub-rg'
+SPOKERGNAME='spoke-rg'
+AZFW_NAME='azfw'
+BASTION_NAME='bastion-hub'
+LOCATION='westus'
+AROCLUSTER='ftaarocluster'                 # the name of your ARO cluster
 PULLSECRETLOCATION=@/mnt/c/Users/vsantana/Downloads/pull-secret.txt
+ACR_NAME='aroacrhackthon'
 
 # VNet Name and IP Addresses
 HUBVNET_NAME=aro-HUB-vnet
@@ -25,7 +26,7 @@ APPGWSUBNET_PREFIX=10.1.5.0/27
 PRIVATEENDPOINTSUBNET_PREFIX=10.1.5.32/25
 
 # 1. creates the resource group
-az group create --name $HUBRGName --location $LOCATION
+az group create --name $HUBRGNAME --location $LOCATION
 az group create --name $SPOKERGNAME --location $LOCATION
 
 # 2. ARO needs minimum of 40 cores, check to make sure your subscription Limit is 40 cores or more
@@ -44,27 +45,27 @@ az provider register -n Microsoft.Authorization --wait
 
 # HUB VNet creation
 az network vnet create \
-   --resource-group $HUBRGName \
+   --resource-group $HUBRGNAME \
    --name $HUBVNET_NAME \
    --address-prefixes $HUBVNET_PREFIX
 
 # AzureFirewallSubnet
 az network vnet subnet create \
-  --resource-group $HUBRGName \
+  --resource-group $HUBRGNAME \
   --vnet-name $HUBVNET_NAME \
   --name AzureFirewallSubnet \
   --address-prefixes $AZFWSUBNET_PREFIX
 
 # AzureBastionSubnet
 az network vnet subnet create \
-  --resource-group $HUBRGName \
+  --resource-group $HUBRGNAME \
   --vnet-name $HUBVNET_NAME \
   --name AzureBastionSubnet \
   --address-prefixes $AZUREBASTIONSUBNET_PREFIX
 
 # VM-Subnet
 az network vnet subnet create \
-  --resource-group $HUBRGName \
+  --resource-group $HUBRGNAME \
   --vnet-name $HUBVNET_NAME \
   --name VM-Subnet \
   --address-prefixes $VMSUBNET_PREFIX
@@ -170,6 +171,44 @@ az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c $aro_
 # 6. Bastion Host
 az network public-ip create -g $HUBRGNAME -n $BASTION_NAME'-PIP' --sku Standard --location $LOCATION
 az network bastion create --name $BASTION_NAME --public-ip-address $BASTION_NAME'-PIP' -g $HUBRGNAME --vnet-name $HUBVNET_NAME --location $LOCATION
+
+# 7. Tools Box (for troubleshooting)
+az vm create \
+  --name 'ToolsBox' \
+  --resource-group $HUBRGNAME \
+  --image UbuntuLTS \
+  --admin-username 'azureuser' \
+  --size 'Standard_A2' \
+  --vnet-name $HUBVNET_NAME \
+  --subnet VM-Subnet \
+  --generate-ssh-keys
+
+# 8. ACR in Spoke VNET with Private Endpoint
+az acr create --resource-group $SPOKERGNAME --name $ACR_NAME --sku Standard --public-network-enabled false
+
+az network private-dns zone create \
+  --resource-group $SPOKERGNAME \
+  --name "privatelink.azurecr.io"
+
+az network private-dns link vnet create \
+  --resource-group $SPOKERGNAME \
+  --zone-name "privatelink.azurecr.io" \
+  --name AcrDNSLink \
+  --virtual-network $SPOKEVNET_NAME \
+  --registration-enabled false
+
+REGISTRY_ID=$(az acr show --name $ACR_NAME \
+  --query 'id' --output tsv)
+
+az network private-endpoint create \
+    --name acrPvtEndpoint \
+    --resource-group $SPOKERGNAME \
+    --vnet-name $SPOKEVNET_NAME \
+    --subnet PrivateEndpoint-subnet \
+    --private-connection-resource-id $REGISTRY_ID \
+    --group-ids registry \
+    --connection-name acrConnection
+
 
 # 8. Create private ARO cluster
 az aro create \
