@@ -2,6 +2,7 @@
 
 HUBRGNAME='hub-rg'
 SPOKERGNAME='spoke-rg'
+ARCRGNAME='arc-rg'
 AZFW_NAME='azfw'
 BASTION_NAME='bastion-hub'
 LOCATION='westus'
@@ -264,12 +265,12 @@ az aro create \
 # 13. Connect to ARO cluster
 az aro list-credentials \
   --name $AROCLUSTER \
-  --resource-group $RGNAME
+  --resource-group $SPOKERGNAME
 
 # 14. Find the ARO cluster console URL and browse using your browser
 az aro show \
     --name $AROCLUSTER \
-    --resource-group $RGNAME \
+    --resource-group $SPOKERGNAME \
     --query "consoleProfile.url" -o tsv
 
 
@@ -303,3 +304,15 @@ sudo apt-get install apt-transport-https --yes
 echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
 sudo apt-get update
 sudo apt-get install helm
+
+#19. Create resource group for arc
+az group create --name $ARCRGNAME --location $LOCATION --output table
+
+#20. add a policy to enable arc
+oc adm policy add-scc-to-user privileged system:serviceaccount:azure-arc:azure-arc-kube-aad-proxy-sa
+
+#21. enable arc
+az connectedk8s connect --name $AROCLUSTER --resource-group $SPOKERGNAME --location $LOCATION
+
+#22. verify
+az connectedk8s list --resource-group $SPOKERGNAME --output table
