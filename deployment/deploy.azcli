@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+SUBSCRIPTIONID='025f66df-d5dd-4a8c-a567-52f157cb8041'
 HUBRGNAME='hub-rg'
 SPOKERGNAME='spoke-rg'
 ARCRGNAME='arc-rg'
@@ -296,9 +297,7 @@ az aro create \
   # --domain foo.example.com # [OPTIONAL] custom domain
 
 # 13. Connect to ARO cluster
-az aro list-credentials \
-  --name $AROCLUSTER \
-  --resource-group $SPOKERGNAME
+AROCLUSTERPWD=$(az aro list-credentials --name $AROCLUSTER --resource-group $SPOKERGNAME --query 'kubeadminPassword' -o tsv)
 
 # 14. Find the ARO cluster console URL and browse using your browser
 az aro show \
@@ -308,6 +307,10 @@ az aro show \
 
 # 15. AZ CLI  installation
 curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+# 15.1 Azure Login
+az login
+az account set -s $SUBSCRIPTIONID
 
 # 16. Download the latest OpenShift 4 CLI for Linux (on the Toolsbox as well)
 cd ~
@@ -321,7 +324,7 @@ echo 'export PATH=$PATH:~/openshift' >> ~/.bashrc && source ~/.bashrc
 apiServer=$(az aro show -g $SPOKERGNAME -n $AROCLUSTER --query apiserverProfile.url -o tsv)
 
 # 17. Login to the OpenShift cluster's API server
-oc login $apiServer -u kubeadmin -p "He3GZ-mnpLA-vmgoZ-PMVvU"
+oc login $apiServer -u kubeadmin -p $AROCLUSTERPWD
 
 # 18. To display all namespaces
 oc get ns
