@@ -268,6 +268,19 @@ az network private-dns link vnet create --resource-group $SPOKERGNAME --zone-nam
 
 az network private-endpoint dns-zone-group create -g $SPOKERGNAME -n 'CosmosDb-ZoneGroup' --endpoint-name 'cosmosdbPvtEndpoint' --private-dns-zone 'privatelink.mongodb.azure.com' --zone-name 'CosmosDB'
 
+# 10.2 Azure KeyVault with Private Link
+az keyvault create -n $KV_NAME -g SPOKERGNAME -l $LOCATION
+az keyvault update -n $KV_NAME -g SPOKERGNAME --default-action deny # Turn on Key Vault Firewall
+KEYVAULT_ID=$(az keyvault show -n $KV_NAME -g SPOKERGNAME --query 'id' -o tsv)
+
+az network private-dns zone create -g $SPOKERGNAME -n 'privatelink.vaultcore.azure.net'
+
+az network private-dns link vnet create -g $SPOKERGNAME -n 'KeyVaultDNSLink' --zone-name 'privatelink.vaultcore.azure.net' --virtual-network $HUBVNET_NAME --registration-enabled true
+
+az network private-endpoint create -n 'kvPvtEndpoint' -g $SPOKERGNAME --vnet-name $SPOKEVNET_NAME --subnet 'PrivateEndpoint-subnet' --private-connection-resource-id $KEYVAULT_ID --group-ids 'vault' --connection-name 'kvConnection'
+
+az network private-endpoint dns-zone-group create -n 'KeyVault-ZoneGroup' -g $SPOKERGNAME --endpoint-name 'kvPvtEndpoint' --private-dns-zone 'privatelink.vaultcore.azure.net' --zone-name 'KEYVAULT'
+
 # 11. Create Azure Application Gateway
 APPGW_NAME=aro-app-gw
 APPGW_SKU=WAF_v2
