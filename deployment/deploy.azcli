@@ -206,38 +206,66 @@ az vm create \
   --subnet VM-Subnet \
   --generate-ssh-keys
 
-# 10. ACR in Spoke VNET with Private Endpoint
+# 10. Supporting Services - ACR, CosmosDB and KeyVault
+# 10.1 ACR in Spoke VNET with Private Endpoint
 az acr create --resource-group $SPOKERGNAME --name $ACR_NAME --sku Standard --public-network-enabled false
 
-az network private-dns zone create \
-  --resource-group $SPOKERGNAME \
-  --name "privatelink.azurecr.io"
+az network private-dns zone create -g $SPOKERGNAME -n 'privatelink.azurecr.io'
 
-az network private-dns link vnet create \
-  --resource-group $SPOKERGNAME \
-  --zone-name "privatelink.azurecr.io" \
-  --name AcrDNSLink \
-  --virtual-network $HUBVNET_NAME \
-  --registration-enabled false
+az network private-dns link vnet create -g $SPOKERGNAME -n 'AcrDNSLink' --zone-name 'privatelink.azurecr.io' --virtual-network $HUBVNET_NAME --registration-enabled false
 
-REGISTRY_ID=$(az acr show --name $ACR_NAME \
-  --query 'id' --output tsv)
+REGISTRY_ID=$(az acr show -n $ACR_NAME --query 'id' -o tsv)
 
-az network private-endpoint create \
-    --name acrPvtEndpoint \
-    --resource-group $SPOKERGNAME \
-    --vnet-name $SPOKEVNET_NAME \
-    --subnet PrivateEndpoint-subnet \
-    --private-connection-resource-id $REGISTRY_ID \
-    --group-ids registry \
-    --connection-name acrConnection
+az network private-endpoint create -n 'acrPvtEndpoint' -g $SPOKERGNAME --vnet-name $SPOKEVNET_NAME --subnet 'PrivateEndpoint-subnet' --private-connection-resource-id $REGISTRY_ID --group-ids 'registry' --connection-name 'acrConnection'
 
-az network private-endpoint dns-zone-group create \
-    --name ACR-ZoneGroup \
-    --resource-group $SPOKERGNAME \
-    --endpoint-name acrPvtEndpoint \
-    --private-dns-zone "privatelink.azurecr.io" \
-    --zone-name ACR
+az network private-endpoint dns-zone-group create -n 'ACR-ZoneGroup' -g $SPOKERGNAME --endpoint-name 'acrPvtEndpoint' --private-dns-zone 'privatelink.azurecr.io' --zone-name 'ACR'
+
+# 10.2 Azure CosmosDB with Private Link
+uniqueId=$RANDOM
+accountName='cosmos-'$uniqueId #needs to be lower case
+databaseName='database1'
+collectionName='collection1'
+
+az cosmosdb create -n $accountName -g $SPOKERGNAME --kind MongoDB --server-version '4.0' --enable-public-network false --default-consistency-level Eventual
+
+# Create a MongoDB API database
+az cosmosdb mongodb database create -a $accountName -g $SPOKERGNAME -n $databaseName
+
+# Define the index policy for the collection, with _id, wildcard, compound, unique and TTL
+printf '
+[
+    {
+        "key": {"keys": ["_id"]}
+    },
+    {
+        "key": {"keys": ["$**"]}
+    },
+    {
+        "key": {"keys": ["user_id", "user_address"]},
+        "options": {"unique": "true"}
+    },
+    {
+        "key": {"keys": ["_ts"]},
+        "options": {"expireAfterSeconds": 2629746}
+    }
+]' > idxpolicy-$uniqueId.json
+
+# Create a MongoDB API collection
+az cosmosdb mongodb collection create -a $accountName -g $SPOKERGNAME -d $databaseName -n $collectionName --shard 'user_id' --throughput 400 --idx @idxpolicy-$uniqueId.json
+
+# Clean up temporary index policy file
+rm -f "idxpolicy-$uniqueId.json"
+
+COSMOSDB_ID=$(az cosmosdb show -n $accountName -g $SPOKERGNAME --query 'id' -o tsv)
+
+# Private Endpoint connection
+az network private-endpoint create -n 'cosmosdbPvtEndpoint' -g $SPOKERGNAME --vnet-name $SPOKEVNET_NAME --subnet 'PrivateEndpoint-subnet' --private-connection-resource-id $COSMOSDB_ID --group-ids 'MongoDB' --connection-name 'cosmosdbConnection'
+
+az network private-dns zone create -g $SPOKERGNAME -n 'privatelink.mongodb.azure.com'
+
+az network private-dns link vnet create --resource-group $SPOKERGNAME --zone-name 'privatelink.mongodb.azure.com' -n 'CosmosDbDNSLink' --virtual-network $HUBVNET_NAME --registration-enabled false
+
+az network private-endpoint dns-zone-group create -g $SPOKERGNAME -n 'CosmosDb-ZoneGroup' --endpoint-name 'cosmosdbPvtEndpoint' --private-dns-zone 'privatelink.mongodb.azure.com' --zone-name 'CosmosDB'
 
 # 11. Create Azure Application Gateway
 APPGW_NAME=aro-app-gw
@@ -278,8 +306,10 @@ az aro show \
     --resource-group $SPOKERGNAME \
     --query "consoleProfile.url" -o tsv
 
+# 15. AZ CLI  installation
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
-# 15. Download the latest OpenShift 4 CLI for Linux (on the Toolsbox as well)
+# 16. Download the latest OpenShift 4 CLI for Linux (on the Toolsbox as well)
 cd ~
 wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
 
@@ -287,17 +317,14 @@ mkdir openshift
 tar -zxvf openshift-client-linux.tar.gz -C openshift
 echo 'export PATH=$PATH:~/openshift' >> ~/.bashrc && source ~/.bashrc
 
-# 16. Connect using the OpenShift CLI
-apiServer=$(az aro show -g $RGNAME -n $AROCLUSTER --query apiserverProfile.url -o tsv)
+# Connect using the OpenShift CLI
+apiServer=$(az aro show -g $SPOKERGNAME -n $AROCLUSTER --query apiserverProfile.url -o tsv)
 
 # 17. Login to the OpenShift cluster's API server
 oc login $apiServer -u kubeadmin -p "He3GZ-mnpLA-vmgoZ-PMVvU"
 
 # 18. To display all namespaces
 oc get ns
-
-# 16. AZ CLI  installation
-curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
 # 17. Docker (optional not sure we need on the Toolsbox VM)
 wget -qO- https://get.docker.com/ | sh >> $logpath
@@ -310,14 +337,14 @@ echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt
 sudo apt-get update
 sudo apt-get install helm
 
-#19. Create resource group for arc
-az group create --name $ARCRGNAME --location $LOCATION --output table
+# 19. Create resource group for arc
+az group create --name $SPOKERGNAME --location $LOCATION --output table
 
-#20. add a policy to enable arc
+# 20. add a policy to enable arc
 oc adm policy add-scc-to-user privileged system:serviceaccount:azure-arc:azure-arc-kube-aad-proxy-sa
 
-#21. enable arc
+# 21. enable arc
 az connectedk8s connect --name $AROCLUSTER --resource-group $SPOKERGNAME --location $LOCATION
 
-#22. verify
+# 22. verify
 az connectedk8s list --resource-group $SPOKERGNAME --output table
