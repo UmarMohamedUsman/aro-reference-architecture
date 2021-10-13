@@ -1,29 +1,28 @@
 #!/usr/bin/env bash
 
-
 HUBRGNAME='hub-rg'
 SPOKERGNAME='spoke-rg'
 AZFW_NAME='azfw'
 BASTION_NAME='bastion-hub'
 LOCATION='westus'
 AROCLUSTER='ftaarocluster'                 # the name of your ARO cluster
-PULLSECRETLOCATION=@/mnt/c/Users/vsantana/Downloads/pull-secret.txt
+PULLSECRETLOCATION=@/mnt/c/Users/umarm/Downloads/pull-secret.txt
 ACR_NAME='aroacrhackthon'
 
 # VNet Name and IP Addresses
-HUBVNET_NAME=aro-HUB-vnet
-HUBVNET_PREFIX=10.0.0.0/16
-AZFWSUBNET_PREFIX=10.0.0.0/26
-AZUREBASTIONSUBNET_PREFIX=10.0.0.64/26
-VMSUBNET_PREFIX=10.0.1.0/24
+HUBVNET_NAME='hub-vnet'
+HUBVNET_PREFIX='10.0.0.0/16'
+AZFWSUBNET_PREFIX='10.0.0.0/26'
+AZUREBASTIONSUBNET_PREFIX='10.0.0.64/26'
+VMSUBNET_PREFIX='10.0.1.0/24'
 
-SPOKEVNET_NAME=aro-SPOKE-vnet
-SPOKEVNET_PREFIX=10.1.0.0/16
-MASTERAROSUBNET_PREFIX=10.1.0.0/23
-WORKERAROSUBNET_PREFIX=10.1.2.0/23
-PRIVATERUNNERSUBNET_PREFIX=10.1.4.0/24
-APPGWSUBNET_PREFIX=10.1.5.0/27
-PRIVATEENDPOINTSUBNET_PREFIX=10.1.5.32/25
+SPOKEVNET_NAME='aro-spoke-vnet'
+SPOKEVNET_PREFIX='10.1.0.0/16'
+MASTERAROSUBNET_PREFIX='10.1.0.0/23'
+WORKERAROSUBNET_PREFIX='10.1.2.0/23'
+PRIVATERUNNERSUBNET_PREFIX='10.1.4.0/24'
+APPGWSUBNET_PREFIX='10.1.5.0/27'
+PRIVATEENDPOINTSUBNET_PREFIX='10.1.6.0/25'
 
 # 1. creates the resource group
 az group create --name $HUBRGNAME --location $LOCATION
@@ -63,7 +62,7 @@ az network vnet subnet create \
   --name AzureBastionSubnet \
   --address-prefixes $AZUREBASTIONSUBNET_PREFIX
 
-# VM-Subnet
+# Tools Box VM-Subnet
 az network vnet subnet create \
   --resource-group $HUBRGNAME \
   --vnet-name $HUBVNET_NAME \
@@ -115,8 +114,10 @@ az network vnet subnet create \
 
 # 4.3 Create Peerings
 # Create Peering
-az network vnet peering create -g $HUBRGNAME -n $HUBVNET_NAME'To'$SPOKEVNET_NAME --vnet-name $HUBVNET_NAME --remote-vnet $SPOKEVNET_NAME --allow-vnet-access --allow-forwarded-traffic
-az network vnet peering create -g $SPOKERGNAME -n $SPOKEVNET_NAME'To'$HUBVNET_NAME --vnet-name $SPOKEVNET_NAME --remote-vnet $HUBVNET_NAME --allow-vnet-access --allow-forwarded-traffic
+SPOKE_VNET_ID=$(az network vnet show --name $SPOKEVNET_NAME --resource-group $SPOKERGNAME --query id -o tsv)
+HUB_VNET_ID=$(az network vnet show --name $HUBVNET_NAME --resource-group $HUBRGNAME --query id -o tsv)
+az network vnet peering create -g $HUBRGNAME -n $HUBVNET_NAME'To'$SPOKEVNET_NAME --vnet-name $HUBVNET_NAME --remote-vnet $SPOKE_VNET_ID --allow-vnet-access --allow-forwarded-traffic
+az network vnet peering create -g $SPOKERGNAME -n $SPOKEVNET_NAME'To'$HUBVNET_NAME --vnet-name $SPOKEVNET_NAME --remote-vnet $HUB_VNET_ID --allow-vnet-access --allow-forwarded-traffic
 
 # 5. Create Azure Firewall
 # AZFW_NAME
@@ -136,30 +137,30 @@ az network firewall network-rule create -f $AZFW_NAME -g $HUBRGNAME -c $aro_coll
 
 # 5.1.2 Create Application Rules
 # FIRST GROUP: INSTALLING AND DOWNLOADING PACKAGES AND TOOLS
-first_group_target_fqdns="quay.io registry.redhat.io sso.redhat.com openshift.org"
 aro_collection_app_rule_name='Aro-required-urls'
+first_group_target_fqdns="quay.io registry.redhat.io sso.redhat.com openshift.org"
 az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c $aro_collection_app_rule_name \
     --protocols Http=80 Https=443 --target-fqdns $first_group_target_fqdns --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX -n first_group_target_fqdns --priority 200 --action Allow
 
 # SECOND GROUP: TELEMETRY
 second_group_target_fqdns="cert-api.access.redhat.com api.access.redhat.com infogw.api.openshift.com cloud.redhat.com"
-az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c $aro_collection_app_rule_name \
+az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c 'Telemetry-URLs' \
     --protocols Http=80 Https=443 --target-fqdns $second_group_target_fqdns --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX -n second_group_target_fqdns --priority 201 --action Allow
 
 # THIRD GROUP: CLOUD APIs
 third_group_target_fqdns="management.azure.com"
-az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c $aro_collection_app_rule_name \
+az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c 'Cloud-APIs' \
     --protocols Http=80 Https=443 --target-fqdns $third_group_target_fqdns --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX -n third_group_target_fqdns --priority 202 --action Allow
 
 # FOURTH GROUP: OTHER OPENSHIFT REQUIREMENTS
 # Note: *.apps.<cluster_name>.<base_domain> (OR EQUIVALENT ARO URL): When allowlisting domains, this is use in your corporate network to reach applications deployed in OpenShift, or to access the OpenShift console.
 fourth_group_target_fqdns="mirror.openshift.com storage.googleapis.com api.openshift.com registry.access.redhat.com"
-az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c $aro_collection_app_rule_name \
+az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c 'OpenShift-URLs' \
     --protocols Http=80 Https=443 --target-fqdns $fourth_group_target_fqdns --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX -n fourth_group_target_fqdns --priority 203 --action Allow
 
 # FIFTH GROUP: MICROSOFT & RED HAT ARO MONITORING SERVICE
 fifth_group_target_fqdns="login.microsoftonline.com gcs.prod.monitoring.core.windows.net *.blob.core.windows.net *.servicebus.windows.net *.table.core.windows.net"
-az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c $aro_collection_app_rule_name \
+az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c 'Monitoring-URLs' \
     --protocols Http=80 Https=443 --target-fqdns $fifth_group_target_fqdns --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX -n fifth_group_target_fqdns --priority 204 --action Allow
 
 # Optional additional Azure FQDNs
@@ -170,7 +171,7 @@ az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c $aro_
 
 # 6. Update VNET DNS IP
 az network vnet update -g $HUBRGNAME -n $HUBVNET_NAME --dns-servers $azfw_private_ip
-az network vnet update -g $HUBRGNAME -n $SPOKEVNET_NAME --dns-servers $azfw_private_ip
+az network vnet update -g $SPOKERGNAME -n $SPOKEVNET_NAME --dns-servers $azfw_private_ip
 
 # 7. Create UDRs
 # 7.1 UDR for ARO
@@ -250,11 +251,11 @@ az network application-gateway create -g $SPOKERGNAME -n $APPGW_NAME -l $LOCATIO
 
 # 12. Create private ARO cluster
 az aro create \
-  --resource-group $RGNAME \
+  --resource-group $SPOKERGNAME \
   --name $AROCLUSTER \
-  --vnet $AROVNET \
-  --master-subnet master-subnet \
-  --worker-subnet worker-subnet \
+  --vnet $SPOKEVNET_NAME \
+  --master-subnet master-aro-subnet \
+  --worker-subnet worker-aro-subnet \
   --apiserver-visibility Private \
   --ingress-visibility Private \
   --pull-secret $PULLSECRETLOCATION
@@ -271,7 +272,8 @@ az aro show \
     --resource-group $RGNAME \
     --query "consoleProfile.url" -o tsv
 
-# 15. Download the latest OpenShift 4 CLI for Linux.
+
+# 15. Download the latest OpenShift 4 CLI for Linux (on the Toolsbox as well)
 cd ~
 wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
 
@@ -287,3 +289,17 @@ oc login $apiServer -u kubeadmin -p "He3GZ-mnpLA-vmgoZ-PMVvU"
 
 # 18. To display all namespaces
 oc get ns
+
+# 16. AZ CLI  installation
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+# 17. Docker (optional not sure we need on the Toolsbox VM)
+wget -qO- https://get.docker.com/ | sh >> $logpath
+sudo usermod -aG docker $1
+
+# 18. Helm (optional not sure we need on the Toolsbox VM)
+curl https://baltocdn.com/helm/signing.asc | sudo apt-key add -
+sudo apt-get install apt-transport-https --yes
+echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+sudo apt-get update
+sudo apt-get install helm
