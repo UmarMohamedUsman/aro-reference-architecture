@@ -325,49 +325,24 @@ az aro show \
     --resource-group $SPOKERGNAME \
     --query "consoleProfile.url" -o tsv
 
-# 15. AZ CLI  installation
-curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-
-# 15.1 Azure Login
+# 15 Azure Login
 az login
 az account set -s $SUBSCRIPTIONID
-
-# 16. Download the latest OpenShift 4 CLI for Linux (on the Toolsbox as well)
-cd ~
-wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
-
-mkdir openshift
-tar -zxvf openshift-client-linux.tar.gz -C openshift
-echo 'export PATH=$PATH:~/openshift' >> ~/.bashrc && source ~/.bashrc
 
 # Connect using the OpenShift CLI
 apiServer=$(az aro show -g $SPOKERGNAME -n $AROCLUSTER --query apiserverProfile.url -o tsv)
 
-# 17. Login to the OpenShift cluster's API server
+# 16. Login to the OpenShift cluster's API server
 oc login $apiServer -u kubeadmin -p $AROCLUSTERPWD
 
-# 18. To display all namespaces
+# 17. To display all namespaces
 oc get ns
 
-# 17. Docker (optional not sure we need on the Toolsbox VM)
-wget -qO- https://get.docker.com/ | sh >> $logpath
-sudo usermod -aG docker $1
-
-# 18. Helm (optional not sure we need on the Toolsbox VM)
-curl https://baltocdn.com/helm/signing.asc | sudo apt-key add -
-sudo apt-get install apt-transport-https --yes
-echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
-sudo apt-get update
-sudo apt-get install helm
-
-# 19. Create resource group for arc
-az group create --name $SPOKERGNAME --location $LOCATION --output table
-
-# 20. add a policy to enable arc
+# 18. add a policy to enable arc
 oc adm policy add-scc-to-user privileged system:serviceaccount:azure-arc:azure-arc-kube-aad-proxy-sa
 
-# 21. enable arc
+# 19. enable arc
 az connectedk8s connect --name $AROCLUSTER --resource-group $SPOKERGNAME --location $LOCATION
 
-# 22. verify
+# 20. verify
 az connectedk8s list --resource-group $SPOKERGNAME --output table
