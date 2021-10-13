@@ -138,7 +138,7 @@ az network firewall network-rule create -f $AZFW_NAME -g $HUBRGNAME -c $aro_coll
 
 # 5.1.2 Create Application Rules
 # Minimum Required FQDN / application rules
-minimum_required_group_target_fqdns="*.quay.io registry.redhat.io mirror.openshift.com api.openshift.com arosvc.azurecr.io management.azure.com login.microsoftonline.com gcs.prod.monitoring.core.windows.net *.blob.core.windows.net *.servicebus.windows.net *.table.core.windows.net"
+minimum_required_group_target_fqdns="arosvc.$LOCATION.data.azurecr.io *.quay.io registry.redhat.io mirror.openshift.com api.openshift.com arosvc.azurecr.io management.azure.com login.microsoftonline.com gcs.prod.monitoring.core.windows.net *.blob.core.windows.net *.servicebus.windows.net *.table.core.windows.net"
 az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c 'Minimum-Required-FQDN' \
     --protocols Http=80 Https=443 --target-fqdns $minimum_required_group_target_fqdns --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX -n minimum_required_group_target_fqdns --priority 200 --action Allow
 
