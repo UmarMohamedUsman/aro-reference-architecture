@@ -207,6 +207,13 @@ az vm create \
   --subnet VM-Subnet \
   --generate-ssh-keys
 
+# 9.1 Install tools in the Tools Box VM
+az vm run-command invoke \
+  --resource-group $HUBRGNAME \
+  --name 'ToolsBox' \
+  --command-id RunShellScript \
+  --scripts "curl -sL https://raw.githubusercontent.com/UmarMohamedUsman/aro-reference-architecture/welasco/deployment/script.sh | sudo bash"
+
 # 10. Supporting Services - ACR, CosmosDB and KeyVault
 # 10.1 ACR in Spoke VNET with Private Endpoint
 az acr create --resource-group $SPOKERGNAME --name $ACR_NAME --sku Standard --public-network-enabled false
@@ -282,20 +289,20 @@ az network private-endpoint create -n 'kvPvtEndpoint' -g $SPOKERGNAME --vnet-nam
 az network private-endpoint dns-zone-group create -n 'KeyVault-ZoneGroup' -g $SPOKERGNAME --endpoint-name 'kvPvtEndpoint' --private-dns-zone 'privatelink.vaultcore.azure.net' --zone-name 'KEYVAULT'
 
 # 11. Create Azure Application Gateway
-APPGW_NAME=aro-app-gw
-APPGW_SKU=WAF_v2
-az network public-ip create \
-  --resource-group $SPOKERGNAME \
-  --name $APPGW_NAME'-pip' \
-  --sku Standard \
-  -l $LOCATION
-appgw_ip=$(az network public-ip show -g $SPOKERGNAME -n $APPGW_NAME --query ipAddress -o tsv)
-az network application-gateway create -g $SPOKERGNAME -n $APPGW_NAME -l $LOCATION \
-          --capacity 2 --sku $APPGW_SKU --frontend-port 80 \
-          --routing-rule-type basic --http-settings-port 80 \
-          --http-settings-protocol Http --public-ip-address $APPGW_NAME'-pip' \
-          --vnet-name $SPOKEVNET_NAME --subnet AppGW-subnet \
-          --servers "dummy.abc.com" --no-wait
+# APPGW_NAME=aro-app-gw
+# APPGW_SKU=WAF_v2
+# az network public-ip create \
+#   --resource-group $SPOKERGNAME \
+#   --name $APPGW_NAME'-pip' \
+#   --sku Standard \
+#   -l $LOCATION
+# appgw_ip=$(az network public-ip show -g $SPOKERGNAME -n $APPGW_NAME --query ipAddress -o tsv)
+# az network application-gateway create -g $SPOKERGNAME -n $APPGW_NAME -l $LOCATION \
+#           --capacity 2 --sku $APPGW_SKU --frontend-port 80 \
+#           --routing-rule-type basic --http-settings-port 80 \
+#           --http-settings-protocol Http --public-ip-address $APPGW_NAME'-pip' \
+#           --vnet-name $SPOKEVNET_NAME --subnet AppGW-subnet \
+#           --servers "dummy.abc.com" --no-wait
 
 # 12. Create private ARO cluster
 az aro create \
