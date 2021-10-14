@@ -347,3 +347,19 @@ az connectedk8s connect --name $AROCLUSTER --resource-group $SPOKERGNAME --locat
 
 # 20. verify
 az connectedk8s list --resource-group $SPOKERGNAME --output table
+
+# 21. Deploy workload on toolsbox for testing
+git clone https://github.com/MicrosoftDocs/mslearn-aks-workshop-ratings-api.git
+
+git clone https://github.com/MicrosoftDocs/mslearn-aks-workshop-ratings-web.git
+
+sudo az acr login -n aroacrhackthon
+
+cd mslearn-aks-workshop-ratings-api
+sudo docker build . -t aroacrhackthon.azurecr.io/ratings-api:v1
+sudo docker push aroacrhackthon.azurecr.io/ratings-api:v1
+cd ..
+
+cd mslearn-aks-workshop-ratings-web
+sudo docker build . -t aroacrhackthon.azurecr.io/ratings-web:v1
+sudo docker push aroacrhackthon.azurecr.io/ratings-web:v1
