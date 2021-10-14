@@ -317,11 +317,55 @@ az afd profile create -g $SPOKERGNAME --profile-name profile --sku Premium_Azure
 
 afd_id=$(az afd profile show -g $SPOKERGNAME --profile-name profile --query 'id' -o tsv)
 
-az monitor diagnostic-settings create -n 'AfdtoLogAnalytics' \
-   --resource $afd_id \
-   --workspace $azlaworkspaceId \
-   --logs '[{\"category\":\"FrontDoorAccessLog\",\"Enabled\":true}, {\"category\":\"FrontDoorHealthProbeLog\",\"Enabled\":true}, {\"category\":\"FrontDoorWebApplicationFirewallLog\",\"Enabled\":true}]' \
-   --metrics '[{\"category\": \"AllMetrics\",\"enabled\": true}]'
+az monitor diagnostic-settings create -n 'AfdtoLogAnalytics' --resource $afd_id --workspace $azlaworkspaceId --logs '[{"category":"FrontDoorAccessLog","Enabled":true}, {"category":"FrontDoorHealthProbeLog","Enabled":true}, {"category":"FrontDoorWebApplicationFirewallLog","Enabled":true}]' --metrics '[{"category": "AllMetrics","enabled": true}]'
+
+az afd endpoint create \
+  -g $SPOKERGNAME \
+  --origin-response-timeout-seconds 60 \
+  --enabled-state Enabled \
+  --endpoint-name 'aro-ilb' \
+  --profile-name 'profile'
+
+az network private-link-service create -n 'ftaaro-pls' -g $SPOKERGNAME --private-ip-address-version IPv4 --private-ip-allocation-method Dynamic --vnet-name $SPOKEVNET_NAME --subnet worker-aro-subnet --lb-frontend-ip-configs /subscriptions/025f66df-d5dd-4a8c-a567-52f157cb8041/resourceGroups/aro-dy3xxxdb/providers/Microsoft.Network/loadBalancers/ftaarocluster-bjq6v-internal/frontendIPConfigurations/a83ab68526d3b4779b5f94832ca5410a
+privatelink_id=$(az network private-link-service show --name ftaaro-pls --resource-group $SPOKERGNAME --query 'id' -o tsv)
+
+az afd origin-group create \
+  --origin-group-name 'afdorigin' \
+  --probe-path '/' \
+  --probe-protocol Http \
+  --probe-request-type GET \
+  --profile-name 'profile' \
+  --resource-group $SPOKERGNAME \
+  --probe-interval-in-seconds 120 \
+  --sample-size 4 \
+  --successful-samples-required 3 \
+  --additional-latency-in-milliseconds 50
+
+az afd origin create \
+  --enable-private-link true \
+  --private-link-resource $privatelink_id \
+  --private-link-location $LOCATION \
+  --private-link-request-message 'Private link service from AFD' \
+  --weight 1000 \
+  --priority 1 \
+  --http-port 80 \
+  --https-port 443 \
+  --origin-group-name 'afdorigin' \
+  --enabled-state Enabled \
+  --host-name 'ratingsapp.vwsazure.com' \
+  --origin-name 'afdorigin' \
+  --profile-name 'profile' \
+  --resource-group $SPOKERGNAME
+
+aro_rgName='aro-'$(az aro show -n $AROCLUSTER -g $SPOKERGNAME --query "clusterProfile.domain" -o tsv)
+
+aropls_Name=$(az network private-link-service list --resource-group $aro_rgName --query '[0].name' -o tsv)
+
+az network lb frontend-ip list -g $aro_rgName --lb-name ftaarocluster-bjq6v-internal
+
+aroPvtLinkAppoval_Id=$(az network private-link-service show --id $privatelink_id --query "privateEndpointConnections[?privateLinkServiceConnectionState.status=='Pending'].privateEndpoint.id" -o tsv)
+
+az network private-endpoint-connection approve --id $aroPvtLinkAppoval_Id --description "Approved"
 
 # 11. Create Azure Application Gateway
 # APPGW_NAME=aro-app-gw
