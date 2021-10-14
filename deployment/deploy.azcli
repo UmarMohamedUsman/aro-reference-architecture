@@ -13,6 +13,7 @@ uniqueId=$RANDOM
 ACR_NAME='aroacr-'$uniqueId
 COSMOSDB_NAME='cosmos-'$uniqueId #needs to be lower case
 KV_NAME='keyvault-'$uniqueId
+LAWORKSPACE_NAME='ftaarohacklw'
 
 # VNet Name and IP Addresses
 HUBVNET_NAME='hub-vnet'
@@ -124,6 +125,10 @@ HUB_VNET_ID=$(az network vnet show --name $HUBVNET_NAME --resource-group $HUBRGN
 az network vnet peering create -g $HUBRGNAME -n $HUBVNET_NAME'To'$SPOKEVNET_NAME --vnet-name $HUBVNET_NAME --remote-vnet $SPOKE_VNET_ID --allow-vnet-access --allow-forwarded-traffic
 az network vnet peering create -g $SPOKERGNAME -n $SPOKEVNET_NAME'To'$HUBVNET_NAME --vnet-name $SPOKEVNET_NAME --remote-vnet $HUB_VNET_ID --allow-vnet-access --allow-forwarded-traffic
 
+# 5. Log Analytics Workspace
+az monitor log-analytics workspace create -g $HUBRGNAME -n $LAWORKSPACE_NAME
+azlaworkspaceId=$(az monitor log-analytics workspace show -g $HUBRGNAME -n $LAWORKSPACE_NAME --query 'id' -o tsv)
+
 # 5. Create Azure Firewall
 # AZFW_NAME
 az network public-ip create -g $HUBRGNAME -n $AZFW_NAME'-pip' --sku standard --allocation-method static -l $LOCATION
@@ -178,6 +183,13 @@ az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c 'Moni
 # target_azure_fqdns="*.azmk8s.io aksrepos.azurecr.io *.blob.core.windows.net mcr.microsoft.com *.cdn.mscr.io management.azure.com login.microsoftonline.com packages.azure.com acs-mirror.azureedge.net *.opinsights.azure.com *.monitoring.azure.com dc.services.visualstudio.com *.ods.opinsights.azure.com *.oms.opinsights.azure.com cloudflare.docker.com data.policy.core.windows.net store.policy.core.windows.net"
 # target_registries_fqdns="$LOCATION.data.mcr.microsoft.com $acr_name.azurecr.io *.gcr.io gcr.io storage.googleapis.com *.docker.io quay.io *.quay.io *.cloudfront.net production.cloudflare.docker.com *.hcp.$location.cx.aks.containerservice.azure.us"
 # target_fqdns="grafana.net grafana.com stats.grafana.org github.com raw.githubusercontent.com security.ubuntu.com security.ubuntu.com packages.microsoft.com azure.archive.ubuntu.com security.ubuntu.com hack32003.vault.azure.net *.letsencrypt.org usage.projectcalico.org gov-prod-policy-data.trafficmanager.net vortex.data.microsoft.com"
+
+# 5.5 Add Diagnostic Settings
+az monitor diagnostic-settings create -n 'toLogAnalytics'
+   --resource $azfw_id
+   --workspace $azlaworkspaceId
+   --logs '[{\"category\":\"AzureFirewallApplicationRule\",\"Enabled\":true}, {\"category\":\"AzureFirewallNetworkRule\",\"Enabled\":true}, {\"category\":\"AzureFirewallDnsProxy\",\"Enabled\":true}]'
+   --metrics '[{\"category\": \"AllMetrics\",\"enabled\": true}]'
 
 # 6. Update VNET DNS IP
 az network vnet update -g $HUBRGNAME -n $HUBVNET_NAME --dns-servers $azfw_private_ip
