@@ -9,7 +9,10 @@ BASTION_NAME='bastion-hub'
 LOCATION='westus'
 AROCLUSTER='ftaarocluster'                 # the name of your ARO cluster
 PULLSECRETLOCATION=@/mnt/c/Users/umarm/Downloads/pull-secret.txt
-ACR_NAME='aroacrhackthon'
+uniqueId=$RANDOM
+ACR_NAME='aroacr-'$uniqueId
+COSMOSDB_NAME='cosmos-'$uniqueId #needs to be lower case
+KV_NAME='keyvault-'$uniqueId
 
 # VNet Name and IP Addresses
 HUBVNET_NAME='hub-vnet'
@@ -105,7 +108,7 @@ az network vnet subnet create \
   --vnet-name $SPOKEVNET_NAME \
   --name PrivateEndpoint-subnet \
   --address-prefixes $PRIVATEENDPOINTSUBNET_PREFIX \
-  --disable-private-link-service-network-policies true
+  --disable-private-endpoint-network-policies true
 
 # PrivateRunner-subnet
 az network vnet subnet create \
@@ -216,11 +219,11 @@ az vm run-command invoke \
 
 # 10. Supporting Services - ACR, CosmosDB and KeyVault
 # 10.1 ACR in Spoke VNET with Private Endpoint
-az acr create --resource-group $SPOKERGNAME --name $ACR_NAME --sku Standard --public-network-enabled false
+az acr create -g $SPOKERGNAME -n $ACR_NAME --sku Premium --public-network-enabled false --admin-enabled true
 
 az network private-dns zone create -g $SPOKERGNAME -n 'privatelink.azurecr.io'
 
-az network private-dns link vnet create -g $SPOKERGNAME -n 'AcrDNSLink' --zone-name 'privatelink.azurecr.io' --virtual-network $HUBVNET_NAME --registration-enabled false
+az network private-dns link vnet create -g $SPOKERGNAME -n 'AcrDNSLink' --zone-name 'privatelink.azurecr.io' --virtual-network $HUB_VNET_ID --registration-enabled false
 
 REGISTRY_ID=$(az acr show -n $ACR_NAME --query 'id' -o tsv)
 
@@ -229,15 +232,13 @@ az network private-endpoint create -n 'acrPvtEndpoint' -g $SPOKERGNAME --vnet-na
 az network private-endpoint dns-zone-group create -n 'ACR-ZoneGroup' -g $SPOKERGNAME --endpoint-name 'acrPvtEndpoint' --private-dns-zone 'privatelink.azurecr.io' --zone-name 'ACR'
 
 # 10.2 Azure CosmosDB with Private Link
-uniqueId=$RANDOM
-accountName='cosmos-'$uniqueId #needs to be lower case
 databaseName='database1'
 collectionName='collection1'
 
-az cosmosdb create -n $accountName -g $SPOKERGNAME --kind MongoDB --server-version '4.0' --enable-public-network false --default-consistency-level Eventual
+az cosmosdb create -n $COSMOSDB_NAME -g $SPOKERGNAME --kind MongoDB --server-version '4.0' --enable-public-network false --default-consistency-level Eventual
 
 # Create a MongoDB API database
-az cosmosdb mongodb database create -a $accountName -g $SPOKERGNAME -n $databaseName
+az cosmosdb mongodb database create -a $COSMOSDB_NAME -g $SPOKERGNAME -n $databaseName
 
 # Define the index policy for the collection, with _id, wildcard, compound, unique and TTL
 printf '
@@ -259,30 +260,30 @@ printf '
 ]' > idxpolicy-$uniqueId.json
 
 # Create a MongoDB API collection
-az cosmosdb mongodb collection create -a $accountName -g $SPOKERGNAME -d $databaseName -n $collectionName --shard 'user_id' --throughput 400 --idx @idxpolicy-$uniqueId.json
+az cosmosdb mongodb collection create -a $COSMOSDB_NAME -g $SPOKERGNAME -d $databaseName -n $collectionName --shard 'user_id' --throughput 400 --idx @idxpolicy-$uniqueId.json
 
 # Clean up temporary index policy file
 rm -f "idxpolicy-$uniqueId.json"
 
-COSMOSDB_ID=$(az cosmosdb show -n $accountName -g $SPOKERGNAME --query 'id' -o tsv)
+COSMOSDB_ID=$(az cosmosdb show -n $COSMOSDB_NAME -g $SPOKERGNAME --query 'id' -o tsv)
 
 # Private Endpoint connection
 az network private-endpoint create -n 'cosmosdbPvtEndpoint' -g $SPOKERGNAME --vnet-name $SPOKEVNET_NAME --subnet 'PrivateEndpoint-subnet' --private-connection-resource-id $COSMOSDB_ID --group-ids 'MongoDB' --connection-name 'cosmosdbConnection'
 
 az network private-dns zone create -g $SPOKERGNAME -n 'privatelink.mongodb.azure.com'
 
-az network private-dns link vnet create --resource-group $SPOKERGNAME --zone-name 'privatelink.mongodb.azure.com' -n 'CosmosDbDNSLink' --virtual-network $HUBVNET_NAME --registration-enabled false
+az network private-dns link vnet create --resource-group $SPOKERGNAME --zone-name 'privatelink.mongodb.azure.com' -n 'CosmosDbDNSLink' --virtual-network $HUB_VNET_ID --registration-enabled false
 
 az network private-endpoint dns-zone-group create -g $SPOKERGNAME -n 'CosmosDb-ZoneGroup' --endpoint-name 'cosmosdbPvtEndpoint' --private-dns-zone 'privatelink.mongodb.azure.com' --zone-name 'CosmosDB'
 
 # 10.2 Azure KeyVault with Private Link
-az keyvault create -n $KV_NAME -g SPOKERGNAME -l $LOCATION
-az keyvault update -n $KV_NAME -g SPOKERGNAME --default-action deny # Turn on Key Vault Firewall
-KEYVAULT_ID=$(az keyvault show -n $KV_NAME -g SPOKERGNAME --query 'id' -o tsv)
+az keyvault create -n $KV_NAME -g $SPOKERGNAME -l $LOCATION
+az keyvault update -n $KV_NAME -g $SPOKERGNAME --default-action deny # Turn on Key Vault Firewall
+KEYVAULT_ID=$(az keyvault show -n $KV_NAME -g $SPOKERGNAME --query 'id' -o tsv)
 
 az network private-dns zone create -g $SPOKERGNAME -n 'privatelink.vaultcore.azure.net'
 
-az network private-dns link vnet create -g $SPOKERGNAME -n 'KeyVaultDNSLink' --zone-name 'privatelink.vaultcore.azure.net' --virtual-network $HUBVNET_NAME --registration-enabled true
+az network private-dns link vnet create -g $SPOKERGNAME -n 'KeyVaultDNSLink' --zone-name 'privatelink.vaultcore.azure.net' --virtual-network $HUB_VNET_ID --registration-enabled true
 
 az network private-endpoint create -n 'kvPvtEndpoint' -g $SPOKERGNAME --vnet-name $SPOKEVNET_NAME --subnet 'PrivateEndpoint-subnet' --private-connection-resource-id $KEYVAULT_ID --group-ids 'vault' --connection-name 'kvConnection'
 
