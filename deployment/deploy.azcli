@@ -6,7 +6,7 @@ SPOKERGNAME='spoke-rg'
 ARCRGNAME='arc-rg'
 AZFW_NAME='azfw'
 BASTION_NAME='bastion-hub'
-LOCATION='westus'
+LOCATION='eastus'
 AROCLUSTER='ftaarocluster'                 # the name of your ARO cluster
 PULLSECRETLOCATION=@/mnt/c/Users/umarm/Downloads/pull-secret.txt
 uniqueId=$RANDOM
@@ -177,6 +177,17 @@ az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c 'Open
 fifth_group_target_fqdns="login.microsoftonline.com gcs.prod.monitoring.core.windows.net *.blob.core.windows.net *.servicebus.windows.net *.table.core.windows.net"
 az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c 'Monitoring-URLs' \
     --protocols Http=80 Https=443 --target-fqdns $fifth_group_target_fqdns --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX -n fifth_group_target_fqdns --priority 205 --action Allow
+
+# SIXTH GROUP: ONBOARDING ARO ON TO ARC
+sixth_group_target_fqdns="management.azure.com $LOCATION.dp.kubernetesconfiguration.azure.com login.microsoftonline.com login.windows.net mcr.microsoft.com *.data.mcr.microsoft.com gbl.his.arc.azure.com *.his.arc.azure.com *.servicebus.windows.net guestnotificationservice.azure.com *.guestnotificationservice.azure.com sts.windows.net k8connecthelm.azureedge.net"
+az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c 'Arc-URLs' \
+    --protocols Http=80 Https=443 --target-fqdns $sixth_group_target_fqdns --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX -n sixth_group_target_fqdns --priority 206 --action Allow
+
+# SEVENTH GROUP: Azure Monitor Container Insights extension for Arc
+seventh_group_target_fqdns="*.ods.opinsights.azure.com *.oms.opinsights.azure.com dc.services.visualstudio.com *.monitoring.azure.com	login.microsoftonline.com"
+az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c 'Arc-ContainerInsights-URLs' \
+    --protocols Http=80 Https=443 --target-fqdns $seventh_group_target_fqdns --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX -n seventh_group_target_fqdns --priority 207 --action Allow
+
 
 # Optional additional Azure FQDNs
 # target_useful_fqdns="ifconfig.co api.snapcraft.io jsonip.com kubernaut.io motd.ubuntu.com"
