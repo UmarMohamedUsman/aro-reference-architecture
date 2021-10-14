@@ -13,7 +13,7 @@ uniqueId=$RANDOM
 ACR_NAME='aroacr-'$uniqueId
 COSMOSDB_NAME='cosmos-'$uniqueId #needs to be lower case
 KV_NAME='keyvault-'$uniqueId
-LAWORKSPACE_NAME='ftaarohacklw'
+LAWORKSPACE_NAME='ftahacklw'
 
 # VNet Name and IP Addresses
 HUBVNET_NAME='hub-vnet'
@@ -196,10 +196,10 @@ az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c 'Arc-
 # target_fqdns="grafana.net grafana.com stats.grafana.org github.com raw.githubusercontent.com security.ubuntu.com security.ubuntu.com packages.microsoft.com azure.archive.ubuntu.com security.ubuntu.com hack32003.vault.azure.net *.letsencrypt.org usage.projectcalico.org gov-prod-policy-data.trafficmanager.net vortex.data.microsoft.com"
 
 # 5.5 Add Diagnostic Settings
-az monitor diagnostic-settings create -n 'toLogAnalytics'
-   --resource $azfw_id
-   --workspace $azlaworkspaceId
-   --logs '[{\"category\":\"AzureFirewallApplicationRule\",\"Enabled\":true}, {\"category\":\"AzureFirewallNetworkRule\",\"Enabled\":true}, {\"category\":\"AzureFirewallDnsProxy\",\"Enabled\":true}]'
+az monitor diagnostic-settings create -n 'AzFWtoLogAnalytics' \
+   --resource $azfw_id \
+   --workspace $azlaworkspaceId \
+   --logs '[{\"category\":\"AzureFirewallApplicationRule\",\"Enabled\":true}, {\"category\":\"AzureFirewallNetworkRule\",\"Enabled\":true}, {\"category\":\"AzureFirewallDnsProxy\",\"Enabled\":true}]' \
    --metrics '[{\"category\": \"AllMetrics\",\"enabled\": true}]'
 
 # 6. Update VNET DNS IP
@@ -311,6 +311,17 @@ az network private-dns link vnet create -g $SPOKERGNAME -n 'KeyVaultDNSLink' --z
 az network private-endpoint create -n 'kvPvtEndpoint' -g $SPOKERGNAME --vnet-name $SPOKEVNET_NAME --subnet 'PrivateEndpoint-subnet' --private-connection-resource-id $KEYVAULT_ID --group-ids 'vault' --connection-name 'kvConnection'
 
 az network private-endpoint dns-zone-group create -n 'KeyVault-ZoneGroup' -g $SPOKERGNAME --endpoint-name 'kvPvtEndpoint' --private-dns-zone 'privatelink.vaultcore.azure.net' --zone-name 'KEYVAULT'
+
+# 11. Create Azure Front Door
+az afd profile create -g $SPOKERGNAME --profile-name profile --sku Premium_AzureFrontDoor
+
+afd_id=$(az afd profile show -g $SPOKERGNAME --profile-name profile --query 'id' -o tsv)
+
+az monitor diagnostic-settings create -n 'AfdtoLogAnalytics' \
+   --resource $afd_id \
+   --workspace $azlaworkspaceId \
+   --logs '[{\"category\":\"FrontDoorAccessLog\",\"Enabled\":true}, {\"category\":\"FrontDoorHealthProbeLog\",\"Enabled\":true}, {\"category\":\"FrontDoorWebApplicationFirewallLog\",\"Enabled\":true}]' \
+   --metrics '[{\"category\": \"AllMetrics\",\"enabled\": true}]'
 
 # 11. Create Azure Application Gateway
 # APPGW_NAME=aro-app-gw
