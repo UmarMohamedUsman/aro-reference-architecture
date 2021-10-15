@@ -16,6 +16,9 @@ KV_NAME='keyvault-'$uniqueId
 LAWORKSPACE_NAME='ftahacklw'
 AFD_NAME='ftahackafd'
 AFD_PLS_NAME='ftaaro-pls'
+AFD_APP_CUSTOM_DOMAIN_NAME='ratingsapp-vwsazure-com'
+ARO_APP_FQDN='ratingsapp.vwsazure.com'
+
 
 # VNet Name and IP Addresses
 HUBVNET_NAME='hub-vnet'
@@ -626,32 +629,36 @@ az afd origin create \
   --origin-group-name 'afdorigin' \
   --enabled-state Enabled \
   --host-name $lbconfig_ip \
-  --origin-host-header 'ratingsapp.vwsazure.com' \
+  #--origin-host-header $ARO_APP_FQDN \
   --origin-name 'afdorigin' \
   --profile-name $AFD_NAME \
   --resource-group $SPOKERGNAME
 
+privatelink_pe_id=$(az network private-link-service show -n $AFD_PLS_NAME -g $SPOKERGNAME --query 'privateEndpointConnections[0].privateEndpoint.id' -o tsv)
+
+# Currently there is a bug in Az CLI that is unable to approve a Private Endpoint in a Private Link Service
+# Bug Link: https://github.com/Azure/azure-cli/issues/19908
+az network private-endpoint-connection approve \
+  --description 'Approved' \
+  --id $privatelink_pe_id
+
 az afd custom-domain create \
   --certificate-type ManagedCertificate \
-  --custom-domain-name ratingsapp-vwsazure-com \
-  --host-name ratingsapp.vwsazure.com \
+  --custom-domain-name $AFD_APP_CUSTOM_DOMAIN_NAME \
+  --host-name $ARO_APP_FQDN \
   --minimum-tls-version TLS12 \
   --profile-name $AFD_NAME \
   --resource-group $SPOKERGNAME
 
-az afd custom-domain wait \
---resource-group $SPOKERGNAME \
---profile-name $AFD_NAME \
---custom-domain-name ratingsapp-vwsazure-com \
---created
-
 az afd custom-domain show \
   --resource-group $SPOKERGNAME \
-  --profile-name profile \
-  --custom-domain-name 'ratingsapp-vwsazure-com' \
+  --profile-name $AFD_NAME \
+  --custom-domain-name $AFD_APP_CUSTOM_DOMAIN_NAME \
   --query "validationProperties"
 
 # Now you have validate your domain. You must create a TXT Record using this name: _dnsauth.ratingsapp.vwsazure.com usgin validationToken as value. This process will take some time to finish the verification.
+# To check if the DNS was created in the expected run NSLOOKUP: nslookup -q=TXT _dnsauth.$ARO_APP_FQDN
+# This validarion process will take some time
 
 az afd route create \
   --endpoint-name 'aro-ilb' \
@@ -663,7 +670,7 @@ az afd route create \
   --route-name 'aro-route' \
   --supported-protocols Http Https \
   --patterns-to-match '/*' \
-  --custom-domains ratingsapp-vwsazure-com
+  --custom-domains $AFD_APP_CUSTOM_DOMAIN_NAME
 
 # 13. Connect to ARO cluster
 AROCLUSTERPWD=$(az aro list-credentials --name $AROCLUSTER --resource-group $SPOKERGNAME --query 'kubeadminPassword' -o tsv)

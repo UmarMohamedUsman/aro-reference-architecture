@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vwsnode
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vwsnode-app
+  namespace: vwsnode
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 25%
+  selector:
+    matchLabels:
+      app: vwsnode-app
+  template:
+    metadata:
+      labels:
+        app: vwsnode-app
+    spec:
+      nodeSelector:
+        "beta.kubernetes.io/os": linux
+      containers:
+        - name: vwsnode
+          #image: welasco/nodejsportexhaustion
+          image: registry.hub.docker.com/welasco/nodejssockethttpserver
+          securityContext:
+            privileged: true
+          ports:
+            - containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+              httpHeaders:
+                - name: Custom-Header
+                  value: Awesome
+            initialDelaySeconds: 3
+            periodSeconds: 3
+          env:
+            - name: ENVTest
+              value: "EnvTestValue"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vwsnode-service
+  namespace: vwsnode
+  annotations:
+    #service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+spec:
+  #type: LoadBalancer
+  type: ClusterIP
+  #externalTrafficPolicy: Local
+  ports:
+    - port: 3000
+      #nodePort: 32302
+  selector:
+    app: vwsnode-app
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vwsnode-ingress
+  namespace: vwsnode
+  annotations:
+spec:
+  rules:
+  - host: ratingsapp.vwsazure.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: vwsnode-service
+            port:
+              number: 3000
