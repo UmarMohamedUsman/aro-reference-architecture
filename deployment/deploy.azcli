@@ -14,6 +14,7 @@ ACR_NAME='aroacr-'$uniqueId
 COSMOSDB_NAME='cosmos-'$uniqueId #needs to be lower case
 KV_NAME='keyvault-'$uniqueId
 LAWORKSPACE_NAME='ftahacklw'
+AFD_NAME='ftahackafd'
 
 # VNet Name and IP Addresses
 HUBVNET_NAME='hub-vnet'
@@ -242,26 +243,59 @@ az vm run-command invoke \
 
 # 10. Supporting Services - ACR, CosmosDB and KeyVault
 # 10.1 ACR in Spoke VNET with Private Endpoint
-az acr create -g $SPOKERGNAME -n $ACR_NAME --sku Premium --public-network-enabled false --admin-enabled true
+az acr create \
+  -g $SPOKERGNAME \
+  -n $ACR_NAME \
+  --sku Premium \
+  --public-network-enabled false \
+  --admin-enabled true
 
-az network private-dns zone create -g $SPOKERGNAME -n 'privatelink.azurecr.io'
+az network private-dns zone create \
+  -g $SPOKERGNAME \
+  -n 'privatelink.azurecr.io'
 
-az network private-dns link vnet create -g $SPOKERGNAME -n 'AcrDNSLink' --zone-name 'privatelink.azurecr.io' --virtual-network $HUB_VNET_ID --registration-enabled false
+az network private-dns link vnet create \
+  -g $SPOKERGNAME \
+  -n 'AcrDNSLink' \
+  --zone-name 'privatelink.azurecr.io' \
+  --virtual-network $HUB_VNET_ID \
+  --registration-enabled false
 
 REGISTRY_ID=$(az acr show -n $ACR_NAME --query 'id' -o tsv)
 
-az network private-endpoint create -n 'acrPvtEndpoint' -g $SPOKERGNAME --vnet-name $SPOKEVNET_NAME --subnet 'PrivateEndpoint-subnet' --private-connection-resource-id $REGISTRY_ID --group-ids 'registry' --connection-name 'acrConnection'
+az network private-endpoint create \
+  -n 'acrPvtEndpoint' \
+  -g $SPOKERGNAME \
+  --vnet-name $SPOKEVNET_NAME \
+  --subnet 'PrivateEndpoint-subnet' \
+  --private-connection-resource-id $REGISTRY_ID \
+  --group-ids 'registry' \
+  --connection-name 'acrConnection'
 
-az network private-endpoint dns-zone-group create -n 'ACR-ZoneGroup' -g $SPOKERGNAME --endpoint-name 'acrPvtEndpoint' --private-dns-zone 'privatelink.azurecr.io' --zone-name 'ACR'
+az network private-endpoint dns-zone-group create \
+  -n 'ACR-ZoneGroup' \
+  -g $SPOKERGNAME \
+  --endpoint-name 'acrPvtEndpoint' \
+  --private-dns-zone 'privatelink.azurecr.io' \
+  --zone-name 'ACR'
 
 # 10.2 Azure CosmosDB with Private Link
 databaseName='database1'
 collectionName='collection1'
 
-az cosmosdb create -n $COSMOSDB_NAME -g $SPOKERGNAME --kind MongoDB --server-version '4.0' --enable-public-network false --default-consistency-level Eventual
+az cosmosdb create \
+  -n $COSMOSDB_NAME \
+  -g $SPOKERGNAME \
+  --kind MongoDB \
+  --server-version '4.0' \
+  --enable-public-network false \
+  --default-consistency-level Eventual
 
 # Create a MongoDB API database
-az cosmosdb mongodb database create -a $COSMOSDB_NAME -g $SPOKERGNAME -n $databaseName
+az cosmosdb mongodb database create \
+  -a $COSMOSDB_NAME \
+  -g $SPOKERGNAME \
+  -n $databaseName
 
 # Define the index policy for the collection, with _id, wildcard, compound, unique and TTL
 printf '
@@ -283,7 +317,14 @@ printf '
 ]' > idxpolicy-$uniqueId.json
 
 # Create a MongoDB API collection
-az cosmosdb mongodb collection create -a $COSMOSDB_NAME -g $SPOKERGNAME -d $databaseName -n $collectionName --shard 'user_id' --throughput 400 --idx @idxpolicy-$uniqueId.json
+az cosmosdb mongodb collection create \
+  -a $COSMOSDB_NAME \
+  -g $SPOKERGNAME \
+  -d $databaseName \
+  -n $collectionName \
+  --shard 'user_id' \
+  --throughput 400 \
+  --idx @idxpolicy-$uniqueId.json
 
 # Clean up temporary index policy file
 rm -f "idxpolicy-$uniqueId.json"
@@ -291,44 +332,64 @@ rm -f "idxpolicy-$uniqueId.json"
 COSMOSDB_ID=$(az cosmosdb show -n $COSMOSDB_NAME -g $SPOKERGNAME --query 'id' -o tsv)
 
 # Private Endpoint connection
-az network private-endpoint create -n 'cosmosdbPvtEndpoint' -g $SPOKERGNAME --vnet-name $SPOKEVNET_NAME --subnet 'PrivateEndpoint-subnet' --private-connection-resource-id $COSMOSDB_ID --group-ids 'MongoDB' --connection-name 'cosmosdbConnection'
+az network private-endpoint create \
+  -n 'cosmosdbPvtEndpoint' \
+  -g $SPOKERGNAME \
+  --vnet-name $SPOKEVNET_NAME \
+  --subnet 'PrivateEndpoint-subnet' \
+  --private-connection-resource-id $COSMOSDB_ID \
+  --group-ids 'MongoDB' \
+  --connection-name 'cosmosdbConnection'
 
-az network private-dns zone create -g $SPOKERGNAME -n 'privatelink.mongodb.azure.com'
+az network private-dns zone create \
+  -g $SPOKERGNAME \
+  -n 'privatelink.mongodb.azure.com'
 
-az network private-dns link vnet create --resource-group $SPOKERGNAME --zone-name 'privatelink.mongodb.azure.com' -n 'CosmosDbDNSLink' --virtual-network $HUB_VNET_ID --registration-enabled false
+az network private-dns link vnet create \
+  --resource-group $SPOKERGNAME \
+  --zone-name 'privatelink.mongodb.azure.com' \
+  -n 'CosmosDbDNSLink' \
+  --virtual-network $HUB_VNET_ID \
+  --registration-enabled false
 
-az network private-endpoint dns-zone-group create -g $SPOKERGNAME -n 'CosmosDb-ZoneGroup' --endpoint-name 'cosmosdbPvtEndpoint' --private-dns-zone 'privatelink.mongodb.azure.com' --zone-name 'CosmosDB'
+az network private-endpoint dns-zone-group create \
+  -g $SPOKERGNAME \
+  -n 'CosmosDb-ZoneGroup' \
+  --endpoint-name 'cosmosdbPvtEndpoint' \
+  --private-dns-zone 'privatelink.mongodb.azure.com' \
+  --zone-name 'CosmosDB'
 
 # 10.3 Azure KeyVault with Private Link
 az keyvault create -n $KV_NAME -g $SPOKERGNAME -l $LOCATION
 az keyvault update -n $KV_NAME -g $SPOKERGNAME --default-action deny # Turn on Key Vault Firewall
 KEYVAULT_ID=$(az keyvault show -n $KV_NAME -g $SPOKERGNAME --query 'id' -o tsv)
 
-az network private-dns zone create -g $SPOKERGNAME -n 'privatelink.vaultcore.azure.net'
+az network private-dns zone create \
+  -g $SPOKERGNAME \
+  -n 'privatelink.vaultcore.azure.net'
 
-az network private-dns link vnet create -g $SPOKERGNAME -n 'KeyVaultDNSLink' --zone-name 'privatelink.vaultcore.azure.net' --virtual-network $HUB_VNET_ID --registration-enabled true
+az network private-dns link vnet create \
+  -g $SPOKERGNAME \
+  -n 'KeyVaultDNSLink' \
+  --zone-name 'privatelink.vaultcore.azure.net' \
+  --virtual-network $HUB_VNET_ID \
+  --registration-enabled true
 
-az network private-endpoint create -n 'kvPvtEndpoint' -g $SPOKERGNAME --vnet-name $SPOKEVNET_NAME --subnet 'PrivateEndpoint-subnet' --private-connection-resource-id $KEYVAULT_ID --group-ids 'vault' --connection-name 'kvConnection'
+az network private-endpoint create \
+  -n 'kvPvtEndpoint' \
+  -g $SPOKERGNAME \
+  --vnet-name $SPOKEVNET_NAME \
+  --subnet 'PrivateEndpoint-subnet' \
+  --private-connection-resource-id $KEYVAULT_ID \
+  --group-ids 'vault' \
+  --connection-name 'kvConnection'
 
-az network private-endpoint dns-zone-group create -n 'KeyVault-ZoneGroup' -g $SPOKERGNAME --endpoint-name 'kvPvtEndpoint' --private-dns-zone 'privatelink.vaultcore.azure.net' --zone-name 'KEYVAULT'
-
-
-
-# XX. Create Azure Application Gateway
-# APPGW_NAME=aro-app-gw
-# APPGW_SKU=WAF_v2
-# az network public-ip create \
-#   --resource-group $SPOKERGNAME \
-#   --name $APPGW_NAME'-pip' \
-#   --sku Standard \
-#   -l $LOCATION
-# appgw_ip=$(az network public-ip show -g $SPOKERGNAME -n $APPGW_NAME --query ipAddress -o tsv)
-# az network application-gateway create -g $SPOKERGNAME -n $APPGW_NAME -l $LOCATION \
-#           --capacity 2 --sku $APPGW_SKU --frontend-port 80 \
-#           --routing-rule-type basic --http-settings-port 80 \
-#           --http-settings-protocol Http --public-ip-address $APPGW_NAME'-pip' \
-#           --vnet-name $SPOKEVNET_NAME --subnet AppGW-subnet \
-#           --servers "dummy.abc.com" --no-wait
+az network private-endpoint dns-zone-group create \
+  -n 'KeyVault-ZoneGroup' \
+  -g $SPOKERGNAME \
+  --endpoint-name 'kvPvtEndpoint' \
+  --private-dns-zone 'privatelink.vaultcore.azure.net' \
+  --zone-name 'KEYVAULT'
 
 # 11. Create private ARO cluster
 az aro create \
@@ -342,22 +403,41 @@ az aro create \
   --pull-secret $PULLSECRETLOCATION
   # --domain foo.example.com # [OPTIONAL] custom domain
 
-
 # 12. Create Azure Front Door
-az network private-link-service create -n 'ftaaro-pls' -g $SPOKERGNAME --private-ip-address-version IPv4 --private-ip-allocation-method Dynamic --vnet-name $SPOKEVNET_NAME --subnet worker-aro-subnet --lb-frontend-ip-configs /subscriptions/025f66df-d5dd-4a8c-a567-52f157cb8041/resourceGroups/aro-dy3xxxdb/providers/Microsoft.Network/loadBalancers/ftaarocluster-bjq6v-internal/frontendIPConfigurations/a83ab68526d3b4779b5f94832ca5410a
-privatelink_id=$(az network private-link-service show --name ftaaro-pls --resource-group $SPOKERGNAME --query 'id' -o tsv)
+aro_rgName='aro-'$(az aro show -n $AROCLUSTER -g $SPOKERGNAME --query "clusterProfile.domain" -o tsv)
+internal_LbName=$(az network lb list --resource-group $aro_rgName --query "[? contains(name, 'internal')].name" -o tsv)
+worker_subnetId=$(az network vnet subnet show -n worker-aro-subnet -g $SPOKERGNAME --vnet-name $SPOKEVNET_NAME --query "id" -o tsv)
+lbconfig_id=$(az network lb frontend-ip list -g $aro_rgName --lb-name $internal_LbName --query "[? contains(subnet.id, 'worker')].id" -o tsv)
+lbconfig_ip=$(az network lb frontend-ip list -g $aro_rgName --lb-name $internal_LbName --query "[? contains(subnet.id, 'worker')].privateIpAddress" -o tsv)
 
-az afd profile create -g $SPOKERGNAME --profile-name profile --sku Premium_AzureFrontDoor
+az network private-link-service create \
+  -n 'ftaaro-pls' \
+  -g $SPOKERGNAME \
+  --private-ip-address-version IPv4 \
+  --private-ip-allocation-method Dynamic \
+  --vnet-name $SPOKEVNET_NAME \
+  --subnet worker-aro-subnet \
+  --lb-frontend-ip-configs $lbconfig_id
 
-afd_id=$(az afd profile show -g $SPOKERGNAME --profile-name profile --query 'id' -o tsv)
-az monitor diagnostic-settings create -n 'AfdtoLogAnalytics' --resource $afd_id --workspace $azlaworkspaceId --logs '[{"category":"FrontDoorAccessLog","Enabled":true}, {"category":"FrontDoorHealthProbeLog","Enabled":true}, {"category":"FrontDoorWebApplicationFirewallLog","Enabled":true}]' --metrics '[{"category": "AllMetrics","enabled": true}]'
+privatelink_id=$(az network private-link-service show -n 'ftaaro-pls' -g $SPOKERGNAME --query 'id' -o tsv)
+
+az afd profile create -g $SPOKERGNAME --profile-name $AFD_NAME --sku Premium_AzureFrontDoor
+
+afd_id=$(az afd profile show -g $SPOKERGNAME --profile-name $AFD_NAME --query 'id' -o tsv)
+
+az monitor diagnostic-settings create \
+  -n 'AfdtoLogAnalytics' \
+  --resource $afd_id \
+  --workspace $azlaworkspaceId \
+  --logs '[{"category":"FrontDoorAccessLog","Enabled":true}, {"category":"FrontDoorHealthProbeLog","Enabled":true}, {"category":"FrontDoorWebApplicationFirewallLog","Enabled":true}]' \
+  --metrics '[{"category": "AllMetrics","enabled": true}]'
 
 az afd endpoint create \
   -g $SPOKERGNAME \
   --origin-response-timeout-seconds 60 \
   --enabled-state Enabled \
   --endpoint-name 'aro-ilb' \
-  --profile-name 'profile'
+  --profile-name $AFD_NAME
 
 az afd origin-group create \
   --origin-group-name 'afdorigin' \
@@ -365,7 +445,7 @@ az afd origin-group create \
   --probe-protocol Http \
   --probe-request-type GET \
   --probe-interval-in-seconds 100 \
-  --profile-name 'profile' \
+  --profile-name $AFD_NAME \
   --resource-group $SPOKERGNAME \
   --probe-interval-in-seconds 120 \
   --sample-size 4 \
@@ -383,10 +463,10 @@ az afd origin create \
   --https-port 443 \
   --origin-group-name 'afdorigin' \
   --enabled-state Enabled \
-  --host-name '10.1.3.254' \
+  --host-name $lbconfig_ip \
   --origin-host-header 'ratingsapp.vwsazure.com' \
   --origin-name 'afdorigin' \
-  --profile-name 'profile' \
+  --profile-name $AFD_NAME \
   --resource-group $SPOKERGNAME
 
 az afd route create \
@@ -394,21 +474,12 @@ az afd route create \
   --forwarding-protocol HttpOnly \
   --https-redirect Disabled \
   --origin-group 'afdorigin' \
-  --profile-name 'profile' \
+  --profile-name $AFD_NAME \
   --resource-group $SPOKERGNAME \
   --route-name 'aro-route' \
   --supported-protocols Http Https \
   --patterns-to-match '/*' \
   --link-to-default-domain Enabled
-
-
-
-aro_rgName='aro-'$(az aro show -n $AROCLUSTER -g $SPOKERGNAME --query "clusterProfile.domain" -o tsv)
-aropls_Name=$(az network private-link-service list --resource-group $aro_rgName --query '[0].name' -o tsv)
-az network lb frontend-ip list -g $aro_rgName --lb-name ftaarocluster-bjq6v-internal
-aroPvtLinkAppoval_Id=$(az network private-link-service show --id $privatelink_id --query "privateEndpointConnections[?privateLinkServiceConnectionState.status=='Pending'].privateEndpoint.id" -o tsv)
-az network private-endpoint-connection approve --id $aroPvtLinkAppoval_Id --description "Approved"
-
 
 # 13. Connect to ARO cluster
 AROCLUSTERPWD=$(az aro list-credentials --name $AROCLUSTER --resource-group $SPOKERGNAME --query 'kubeadminPassword' -o tsv)
