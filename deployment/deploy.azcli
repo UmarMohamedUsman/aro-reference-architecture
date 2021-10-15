@@ -15,6 +15,7 @@ COSMOSDB_NAME='cosmos-'$uniqueId #needs to be lower case
 KV_NAME='keyvault-'$uniqueId
 LAWORKSPACE_NAME='ftahacklw'
 AFD_NAME='ftahackafd'
+AFD_PLS_NAME='ftaaro-pls'
 
 # VNet Name and IP Addresses
 HUBVNET_NAME='hub-vnet'
@@ -35,7 +36,7 @@ PRIVATERUNNERSUBNET_NAME=PrivateRunner-subnet
 APPGWSUBNET_PREFIX='10.1.5.0/27'
 APPGWSUBNET_NAME=AppGW-subnet
 PRIVATEENDPOINTSUBNET_PREFIX='10.1.6.0/25'
-PRIVATEENDPOINTSUBNET_NAME=PrivateEndpoint-subnet
+PRIVATEENDPOINTSUBNET_NAME='PrivateEndpoint-subnet'
 
 # 1. creates the resource group
 az group create --name $HUBRGNAME --location $LOCATION
@@ -569,7 +570,7 @@ lbconfig_id=$(az network lb frontend-ip list -g $aro_rgName --lb-name $internal_
 lbconfig_ip=$(az network lb frontend-ip list -g $aro_rgName --lb-name $internal_LbName --query "[? contains(subnet.id, 'worker')].privateIpAddress" -o tsv)
 
 az network private-link-service create \
-  --name 'ftaaro-pls' \
+  --name $AFD_PLS_NAME \
   --resource-group $SPOKERGNAME \
   --private-ip-address-version IPv4 \
   --private-ip-allocation-method Dynamic \
@@ -577,7 +578,7 @@ az network private-link-service create \
   --subnet $WORKERAROSUBNET_NAME \
   --lb-frontend-ip-configs $lbconfig_id
 
-privatelink_id=$(az network private-link-service show -n 'ftaaro-pls' -g $SPOKERGNAME --query 'id' -o tsv)
+privatelink_id=$(az network private-link-service show -n $AFD_PLS_NAME -g $SPOKERGNAME --query 'id' -o tsv)
 
 az afd profile create \
   --resource-group $SPOKERGNAME \
