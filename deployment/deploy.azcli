@@ -319,7 +319,6 @@ az network firewall application-rule create \
   --name eighth_group_target_fqdns \
   --priority 208 \
   --action Allow
-registry.hub.docker.com,*.docker.io,production.cloudflare.docker.com,auth.docker.io
 
 # Optional additional Azure FQDNs
 # target_useful_fqdns="ifconfig.co api.snapcraft.io jsonip.com kubernaut.io motd.ubuntu.com"
