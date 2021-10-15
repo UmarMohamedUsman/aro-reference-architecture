@@ -22,14 +22,20 @@ HUBVNET_PREFIX='10.0.0.0/16'
 AZFWSUBNET_PREFIX='10.0.0.0/26'
 AZUREBASTIONSUBNET_PREFIX='10.0.0.64/26'
 VMSUBNET_PREFIX='10.0.1.0/24'
+VMSUBNET_NAME=VM-Subnet
 
 SPOKEVNET_NAME='aro-spoke-vnet'
+MASTERAROSUBNET_NAME=master-aro-subnet
+WORKERAROSUBNET_NAME=worker-aro-subnet
 SPOKEVNET_PREFIX='10.1.0.0/16'
 MASTERAROSUBNET_PREFIX='10.1.0.0/23'
 WORKERAROSUBNET_PREFIX='10.1.2.0/23'
 PRIVATERUNNERSUBNET_PREFIX='10.1.4.0/24'
+PRIVATERUNNERSUBNET_NAME=PrivateRunner-subnet
 APPGWSUBNET_PREFIX='10.1.5.0/27'
+APPGWSUBNET_NAME=AppGW-subnet
 PRIVATEENDPOINTSUBNET_PREFIX='10.1.6.0/25'
+PRIVATEENDPOINTSUBNET_NAME=PrivateEndpoint-subnet
 
 # 1. creates the resource group
 az group create --name $HUBRGNAME --location $LOCATION
@@ -73,7 +79,7 @@ az network vnet subnet create \
 az network vnet subnet create \
   --resource-group $HUBRGNAME \
   --vnet-name $HUBVNET_NAME \
-  --name VM-Subnet \
+  --name $VMSUBNET_NAME \
   --address-prefixes $VMSUBNET_PREFIX
 
 # 4.2 Create SPOKE virtual network
@@ -86,7 +92,7 @@ az network vnet create \
 az network vnet subnet create \
   --resource-group $SPOKERGNAME \
   --vnet-name $SPOKEVNET_NAME \
-  --name master-aro-subnet \
+  --name $MASTERAROSUBNET_NAME \
   --address-prefixes $MASTERAROSUBNET_PREFIX \
   --disable-private-link-service-network-policies true
 
@@ -94,21 +100,21 @@ az network vnet subnet create \
 az network vnet subnet create \
   --resource-group $SPOKERGNAME \
   --vnet-name $SPOKEVNET_NAME \
-  --name worker-aro-subnet \
+  --name $WORKERAROSUBNET_NAME \
   --address-prefixes $WORKERAROSUBNET_PREFIX
 
 # AppGW-subnet
 az network vnet subnet create \
   --resource-group $SPOKERGNAME \
   --vnet-name $SPOKEVNET_NAME \
-  --name AppGW-subnet \
+  --name $APPGWSUBNET_NAME \
   --address-prefixes $APPGWSUBNET_PREFIX
 
 # PrivateEndpoint-subnet
 az network vnet subnet create \
   --resource-group $SPOKERGNAME \
   --vnet-name $SPOKEVNET_NAME \
-  --name PrivateEndpoint-subnet \
+  --name $PRIVATEENDPOINTSUBNET_NAME \
   --address-prefixes $PRIVATEENDPOINTSUBNET_PREFIX \
   --disable-private-endpoint-network-policies true
 
@@ -116,79 +122,200 @@ az network vnet subnet create \
 az network vnet subnet create \
   --resource-group $SPOKERGNAME \
   --vnet-name $SPOKEVNET_NAME \
-  --name PrivateRunner-subnet \
+  --name $PRIVATERUNNERSUBNET_NAME \
   --address-prefixes $PRIVATERUNNERSUBNET_PREFIX
 
 # 4.3 Create Peerings
 # Create Peering
 SPOKE_VNET_ID=$(az network vnet show --name $SPOKEVNET_NAME --resource-group $SPOKERGNAME --query id -o tsv)
 HUB_VNET_ID=$(az network vnet show --name $HUBVNET_NAME --resource-group $HUBRGNAME --query id -o tsv)
-az network vnet peering create -g $HUBRGNAME -n $HUBVNET_NAME'To'$SPOKEVNET_NAME --vnet-name $HUBVNET_NAME --remote-vnet $SPOKE_VNET_ID --allow-vnet-access --allow-forwarded-traffic
-az network vnet peering create -g $SPOKERGNAME -n $SPOKEVNET_NAME'To'$HUBVNET_NAME --vnet-name $SPOKEVNET_NAME --remote-vnet $HUB_VNET_ID --allow-vnet-access --allow-forwarded-traffic
+az network vnet peering create \
+  --resource-group $HUBRGNAME \
+  --name $HUBVNET_NAME'To'$SPOKEVNET_NAME \
+  --vnet-name $HUBVNET_NAME \
+  --remote-vnet $SPOKE_VNET_ID \
+  --allow-vnet-access \
+  --allow-forwarded-traffic
+az network vnet peering create \
+  --resource-group $SPOKERGNAME \
+  --name $SPOKEVNET_NAME'To'$HUBVNET_NAME \
+  --vnet-name $SPOKEVNET_NAME \
+  --remote-vnet $HUB_VNET_ID \
+  --allow-vnet-access \
+  --allow-forwarded-traffic
 
 # 5. Log Analytics Workspace
-az monitor log-analytics workspace create -g $HUBRGNAME -n $LAWORKSPACE_NAME
+az monitor log-analytics workspace create \
+  --resource-group $HUBRGNAME \
+  --name $LAWORKSPACE_NAME
 azlaworkspaceId=$(az monitor log-analytics workspace show -g $HUBRGNAME -n $LAWORKSPACE_NAME --query 'id' -o tsv)
 
 # 5. Create Azure Firewall
 # AZFW_NAME
-az network public-ip create -g $HUBRGNAME -n $AZFW_NAME'-pip' --sku standard --allocation-method static -l $LOCATION
+az network public-ip create
+  --resource-group $HUBRGNAME \
+  --name $AZFW_NAME'-pip' \
+  --sku standard \
+  --allocation-method static \
+  --location $LOCATION
+
 azfw_ip=$(az network public-ip show -g $HUBRGNAME -n $AZFW_NAME'-pip' --query ipAddress -o tsv)
-az network firewall create -n $AZFW_NAME -g $HUBRGNAME -l $LOCATION --enable-dns-proxy true
+
+az network firewall create \
+  --name $AZFW_NAME \
+  --resource-group $HUBRGNAME \
+  --location $LOCATION \
+  --enable-dns-proxy true
+
 azfw_id=$(az network firewall show -n $AZFW_NAME -g $HUBRGNAME -o tsv --query id)
-az network firewall ip-config create -f $AZFW_NAME -n azfw-ipconfig -g $HUBRGNAME --public-ip-address $AZFW_NAME'-pip' --vnet-name $HUBVNET_NAME
-az network firewall update -n $AZFW_NAME -g $HUBRGNAME
+
+az network firewall ip-config create \
+  --firewall-name $AZFW_NAME \
+  --name azfw-ipconfig \
+  --resource-group $HUBRGNAME \
+  --public-ip-address $AZFW_NAME'-pip' \
+  --vnet-name $HUBVNET_NAME
+
+az network firewall update \
+  --name $AZFW_NAME \
+  --resource-group $HUBRGNAME
+
 azfw_private_ip=$(az network firewall show -n $AZFW_NAME -g $HUBRGNAME -o tsv --query 'ipConfigurations[0].privateIpAddress')
 
 # 5.1 Create Firewall Rules
 # 5.1.1 Create Network Rules
 aro_collection_network_rule_name='Aro-required-ports'
-az network firewall network-rule create -f $AZFW_NAME -g $HUBRGNAME -c $aro_collection_network_rule_name \
-    --protocols any --destination-addresses '*' --destination-ports 123 --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX -n NTP --priority 200 --action Allow
+az network firewall network-rule create \
+  --firewall-name $AZFW_NAME -g $HUBRGNAME \
+  --collection-name $aro_collection_network_rule_name \
+  --protocols any \
+  --destination-addresses '*' \
+  --destination-ports 123 \
+  --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX \
+  --name NTP \
+  --priority 200 \
+  --action Allow
 
 # 5.1.2 Create Application Rules
 # Minimum Required FQDN / application rules
 minimum_required_group_target_fqdns="arosvc.$LOCATION.data.azurecr.io *.quay.io registry.redhat.io mirror.openshift.com api.openshift.com arosvc.azurecr.io management.azure.com login.microsoftonline.com gcs.prod.monitoring.core.windows.net *.blob.core.windows.net *.servicebus.windows.net *.table.core.windows.net"
-az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c 'Minimum-Required-FQDN' \
-    --protocols Http=80 Https=443 --target-fqdns $minimum_required_group_target_fqdns --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX -n minimum_required_group_target_fqdns --priority 200 --action Allow
+az network firewall application-rule create \
+  --firewall-name $AZFW_NAME \
+  --resource-group $HUBRGNAME \
+  --collection-name 'Minimum-Required-FQDN' \
+  --protocols Http=80 Https=443 \
+  --target-fqdns $minimum_required_group_target_fqdns \
+  --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX \
+  --name minimum_required_group_target_fqdns \
+  --priority 200 \
+  --action Allow
 
 # FIRST GROUP: INSTALLING AND DOWNLOADING PACKAGES AND TOOLS
 aro_collection_app_rule_name='Aro-required-urls'
 first_group_target_fqdns="quay.io registry.redhat.io sso.redhat.com openshift.org"
-az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c $aro_collection_app_rule_name \
-    --protocols Http=80 Https=443 --target-fqdns $first_group_target_fqdns --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX -n first_group_target_fqdns --priority 201 --action Allow
+az network firewall application-rule create \
+  --firewall-name $AZFW_NAME \
+  --resource-group $HUBRGNAME \
+  --collection-name $aro_collection_app_rule_name \
+  --protocols Http=80 Https=443 \
+  --target-fqdns $first_group_target_fqdns \
+  --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX \
+  --name first_group_target_fqdns \
+  --priority 201 \
+  --action Allow
 
 # SECOND GROUP: TELEMETRY
 second_group_target_fqdns="cert-api.access.redhat.com api.access.redhat.com infogw.api.openshift.com cloud.redhat.com"
-az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c 'Telemetry-URLs' \
-    --protocols Http=80 Https=443 --target-fqdns $second_group_target_fqdns --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX -n second_group_target_fqdns --priority 202 --action Allow
+az network firewall application-rule create \
+  --firewall-name $AZFW_NAME \
+  --resource-group $HUBRGNAME \
+  --collection-name 'Telemetry-URLs' \
+  --protocols Http=80 Https=443 \
+  --target-fqdns $second_group_target_fqdns \
+  --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX \
+  --name second_group_target_fqdns \
+  --priority 202 \
+  --action Allow
 
 # THIRD GROUP: CLOUD APIs
 third_group_target_fqdns="management.azure.com"
-az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c 'Cloud-APIs' \
-    --protocols Http=80 Https=443 --target-fqdns $third_group_target_fqdns --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX -n third_group_target_fqdns --priority 203 --action Allow
+az network firewall application-rule create \
+  --firewall-name $AZFW_NAME \
+  --resource-group $HUBRGNAME \
+  --collection-name 'Cloud-APIs' \
+  --protocols Http=80 Https=443 \
+  --target-fqdns $third_group_target_fqdns \
+  --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX \
+  --name third_group_target_fqdns \
+  --priority 203 \
+  --action Allow
 
 # FOURTH GROUP: OTHER OPENSHIFT REQUIREMENTS
 # Note: *.apps.<cluster_name>.<base_domain> (OR EQUIVALENT ARO URL): When allowlisting domains, this is use in your corporate network to reach applications deployed in OpenShift, or to access the OpenShift console.
 fourth_group_target_fqdns="mirror.openshift.com storage.googleapis.com api.openshift.com registry.access.redhat.com"
-az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c 'OpenShift-URLs' \
-    --protocols Http=80 Https=443 --target-fqdns $fourth_group_target_fqdns --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX -n fourth_group_target_fqdns --priority 204 --action Allow
+az network firewall application-rule create \
+  --firewall-name $AZFW_NAME \
+  --resource-group $HUBRGNAME \
+  --collection-name 'OpenShift-URLs' \
+  --protocols Http=80 Https=443 \
+  --target-fqdns $fourth_group_target_fqdns \
+  --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX \
+  --name fourth_group_target_fqdns \
+  --priority 204 \
+  --action Allow
 
 # FIFTH GROUP: MICROSOFT & RED HAT ARO MONITORING SERVICE
 fifth_group_target_fqdns="login.microsoftonline.com gcs.prod.monitoring.core.windows.net *.blob.core.windows.net *.servicebus.windows.net *.table.core.windows.net"
-az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c 'Monitoring-URLs' \
-    --protocols Http=80 Https=443 --target-fqdns $fifth_group_target_fqdns --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX -n fifth_group_target_fqdns --priority 205 --action Allow
+az network firewall application-rule create \
+  --firewall-name $AZFW_NAME \
+  --resource-group $HUBRGNAME \
+  --collection-name 'Monitoring-URLs' \
+  --protocols Http=80 Https=443 \
+  --target-fqdns $fifth_group_target_fqdns \
+  --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX \
+  --name fifth_group_target_fqdns \
+  --priority 205 \
+  --action Allow
 
 # SIXTH GROUP: ONBOARDING ARO ON TO ARC
 sixth_group_target_fqdns="management.azure.com $LOCATION.dp.kubernetesconfiguration.azure.com login.microsoftonline.com login.windows.net mcr.microsoft.com *.data.mcr.microsoft.com gbl.his.arc.azure.com *.his.arc.azure.com *.servicebus.windows.net guestnotificationservice.azure.com *.guestnotificationservice.azure.com sts.windows.net k8connecthelm.azureedge.net"
-az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c 'Arc-URLs' \
-    --protocols Http=80 Https=443 --target-fqdns $sixth_group_target_fqdns --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX -n sixth_group_target_fqdns --priority 206 --action Allow
+az network firewall application-rule create \
+  --firewall-name $AZFW_NAME \
+  --resource-group $HUBRGNAME \
+  --collection-name 'Arc-URLs' \
+  --protocols Http=80 Https=443 \
+  --target-fqdns $sixth_group_target_fqdns \
+  --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX \
+  --name sixth_group_target_fqdns \
+  --priority 206 \
+  --action Allow
 
 # SEVENTH GROUP: Azure Monitor Container Insights extension for Arc
 seventh_group_target_fqdns="*.ods.opinsights.azure.com *.oms.opinsights.azure.com dc.services.visualstudio.com *.monitoring.azure.com	login.microsoftonline.com"
-az network firewall application-rule create -f $AZFW_NAME -g $HUBRGNAME -c 'Arc-ContainerInsights-URLs' \
-    --protocols Http=80 Https=443 --target-fqdns $seventh_group_target_fqdns --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX -n seventh_group_target_fqdns --priority 207 --action Allow
+az network firewall application-rule create \
+  --firewall-name $AZFW_NAME \
+  --resource-group $HUBRGNAME \
+  --collection-name 'Arc-ContainerInsights-URLs' \
+  --protocols Http=80 Https=443 \
+  --target-fqdns $seventh_group_target_fqdns \
+  --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX \
+  --name seventh_group_target_fqdns \
+  --priority 207 \
+  --action Allow
 
+# EIGHTH GROUP: Docker HUB Optional for testing porpuse
+eighth_group_target_fqdns="registry.hub.docker.com,*.docker.io,production.cloudflare.docker.com,auth.docker.io"
+az network firewall application-rule create \
+  --firewall-name $AZFW_NAME \
+  --resource-group $HUBRGNAME \
+  --collection-name 'Docker-HUB-URLs' \
+  --protocols Http=80 Https=443 \
+  --target-fqdns $eighth_group_target_fqdns \
+  --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX \
+  --name eighth_group_target_fqdns \
+  --priority 208 \
+  --action Allow
+registry.hub.docker.com,*.docker.io,production.cloudflare.docker.com,auth.docker.io
 
 # Optional additional Azure FQDNs
 # target_useful_fqdns="ifconfig.co api.snapcraft.io jsonip.com kubernaut.io motd.ubuntu.com"
@@ -204,24 +331,55 @@ az monitor diagnostic-settings create -n 'AzFWtoLogAnalytics' \
    --metrics '[{\"category\": \"AllMetrics\",\"enabled\": true}]'
 
 # 6. Update VNET DNS IP
-az network vnet update -g $HUBRGNAME -n $HUBVNET_NAME --dns-servers $azfw_private_ip
-az network vnet update -g $SPOKERGNAME -n $SPOKEVNET_NAME --dns-servers $azfw_private_ip
+az network vnet update \
+  --resource-group $HUBRGNAME \
+  --name $HUBVNET_NAME \
+  --dns-servers $azfw_private_ip
+az network vnet update \
+  --resource-group $SPOKERGNAME \
+  --name $SPOKEVNET_NAME \
+  --dns-servers $azfw_private_ip
 
 # 7. Create UDRs
 # 7.1 UDR for ARO
 ARO_UDR_NAME='aro-udr'
-az network route-table create -n $ARO_UDR_NAME -g $HUBRGNAME -l $LOCATION
-az network route-table route create -n defaultRoute --route-table-name $ARO_UDR_NAME -g $HUBRGNAME \
-    --next-hop-type VirtualAppliance --address-prefix "0.0.0.0/0" --next-hop-ip-address $azfw_private_ip
+az network route-table create \
+  --name $ARO_UDR_NAME \
+  --resource-group $HUBRGNAME \
+  --location $LOCATION
+az network route-table route create \
+  --name defaultRoute \
+  --route-table-name $ARO_UDR_NAME \
+  --resource-group $HUBRGNAME \
+  --next-hop-type VirtualAppliance \
+  --address-prefix "0.0.0.0/0" \
+  --next-hop-ip-address $azfw_private_ip
 aro_rt_id=$(az network route-table show -n $ARO_UDR_NAME -g $HUBRGNAME -o tsv --query id)
-az network vnet subnet update -g $SPOKERGNAME --vnet-name $SPOKEVNET_NAME -n master-aro-subnet --route-table $aro_rt_id
-az network vnet subnet update -g $SPOKERGNAME --vnet-name $SPOKEVNET_NAME -n worker-aro-subnet --route-table $aro_rt_id
+az network vnet subnet update \
+  --resource-group $SPOKERGNAME \
+  --vnet-name $SPOKEVNET_NAME \
+  --name $MASTERAROSUBNET_NAME \
+  --route-table $aro_rt_id
+az network vnet subnet update \
+  --resource-group $SPOKERGNAME \
+  --vnet-name $SPOKEVNET_NAME \
+  --name $WORKERAROSUBNET_NAME \
+  --route-table $aro_rt_id
 
 # 7.2 TODO: UDR for VMs/Toolsbox and PrivateRunner
 
 # 8. Bastion Host
-az network public-ip create -g $HUBRGNAME -n $BASTION_NAME'-PIP' --sku Standard --location $LOCATION
-az network bastion create --name $BASTION_NAME --public-ip-address $BASTION_NAME'-PIP' -g $HUBRGNAME --vnet-name $HUBVNET_NAME --location $LOCATION
+az network public-ip create \
+  --resource-group $HUBRGNAME \
+  --name $BASTION_NAME'-PIP' \
+  --sku Standard \
+  --location $LOCATION
+az network bastion create \
+  --name $BASTION_NAME \
+  --public-ip-address $BASTION_NAME'-PIP' \
+  --resource-group $HUBRGNAME \
+  --vnet-name $HUBVNET_NAME \
+  --location $LOCATION
 
 # 9. Tools Box (for troubleshooting)
 az vm create \
@@ -231,7 +389,7 @@ az vm create \
   --admin-username 'azureuser' \
   --size 'Standard_A2' \
   --vnet-name $HUBVNET_NAME \
-  --subnet VM-Subnet \
+  --subnet $VMSUBNET_NAME \
   --generate-ssh-keys
 
 # 9.1 Install tools in the Tools Box VM
@@ -244,19 +402,19 @@ az vm run-command invoke \
 # 10. Supporting Services - ACR, CosmosDB and KeyVault
 # 10.1 ACR in Spoke VNET with Private Endpoint
 az acr create \
-  -g $SPOKERGNAME \
-  -n $ACR_NAME \
+  --resource-group $SPOKERGNAME \
+  --name $ACR_NAME \
   --sku Premium \
   --public-network-enabled false \
   --admin-enabled true
 
 az network private-dns zone create \
-  -g $SPOKERGNAME \
-  -n 'privatelink.azurecr.io'
+  --resource-group $SPOKERGNAME \
+  --name 'privatelink.azurecr.io'
 
 az network private-dns link vnet create \
-  -g $SPOKERGNAME \
-  -n 'AcrDNSLink' \
+  --resource-group $SPOKERGNAME \
+  --name 'AcrDNSLink' \
   --zone-name 'privatelink.azurecr.io' \
   --virtual-network $HUB_VNET_ID \
   --registration-enabled false
@@ -264,17 +422,17 @@ az network private-dns link vnet create \
 REGISTRY_ID=$(az acr show -n $ACR_NAME --query 'id' -o tsv)
 
 az network private-endpoint create \
-  -n 'acrPvtEndpoint' \
-  -g $SPOKERGNAME \
+  --name 'acrPvtEndpoint' \
+  --resource-group $SPOKERGNAME \
   --vnet-name $SPOKEVNET_NAME \
-  --subnet 'PrivateEndpoint-subnet' \
+  --subnet $PRIVATEENDPOINTSUBNET_NAME \
   --private-connection-resource-id $REGISTRY_ID \
   --group-ids 'registry' \
   --connection-name 'acrConnection'
 
 az network private-endpoint dns-zone-group create \
-  -n 'ACR-ZoneGroup' \
-  -g $SPOKERGNAME \
+  --name 'ACR-ZoneGroup' \
+  --resource-group $SPOKERGNAME \
   --endpoint-name 'acrPvtEndpoint' \
   --private-dns-zone 'privatelink.azurecr.io' \
   --zone-name 'ACR'
@@ -284,8 +442,8 @@ databaseName='database1'
 collectionName='collection1'
 
 az cosmosdb create \
-  -n $COSMOSDB_NAME \
-  -g $SPOKERGNAME \
+  --name $COSMOSDB_NAME \
+  --resource-group $SPOKERGNAME \
   --kind MongoDB \
   --server-version '4.0' \
   --enable-public-network false \
@@ -293,9 +451,9 @@ az cosmosdb create \
 
 # Create a MongoDB API database
 az cosmosdb mongodb database create \
-  -a $COSMOSDB_NAME \
-  -g $SPOKERGNAME \
-  -n $databaseName
+  --account-name $COSMOSDB_NAME \
+  --resource-group $SPOKERGNAME \
+  --name $databaseName
 
 # Define the index policy for the collection, with _id, wildcard, compound, unique and TTL
 printf '
@@ -318,10 +476,10 @@ printf '
 
 # Create a MongoDB API collection
 az cosmosdb mongodb collection create \
-  -a $COSMOSDB_NAME \
-  -g $SPOKERGNAME \
-  -d $databaseName \
-  -n $collectionName \
+  --account-name $COSMOSDB_NAME \
+  --resource-group $SPOKERGNAME \
+  --database-name $databaseName \
+  --name $collectionName \
   --shard 'user_id' \
   --throughput 400 \
   --idx @idxpolicy-$uniqueId.json
@@ -333,28 +491,28 @@ COSMOSDB_ID=$(az cosmosdb show -n $COSMOSDB_NAME -g $SPOKERGNAME --query 'id' -o
 
 # Private Endpoint connection
 az network private-endpoint create \
-  -n 'cosmosdbPvtEndpoint' \
-  -g $SPOKERGNAME \
+  --name 'cosmosdbPvtEndpoint' \
+  --resource-group $SPOKERGNAME \
   --vnet-name $SPOKEVNET_NAME \
-  --subnet 'PrivateEndpoint-subnet' \
+  --subnet $PRIVATEENDPOINTSUBNET_NAME \
   --private-connection-resource-id $COSMOSDB_ID \
   --group-ids 'MongoDB' \
   --connection-name 'cosmosdbConnection'
 
 az network private-dns zone create \
-  -g $SPOKERGNAME \
-  -n 'privatelink.mongodb.azure.com'
+  --resource-group $SPOKERGNAME \
+  --name 'privatelink.mongodb.azure.com'
 
 az network private-dns link vnet create \
   --resource-group $SPOKERGNAME \
   --zone-name 'privatelink.mongodb.azure.com' \
-  -n 'CosmosDbDNSLink' \
+  --name 'CosmosDbDNSLink' \
   --virtual-network $HUB_VNET_ID \
   --registration-enabled false
 
 az network private-endpoint dns-zone-group create \
-  -g $SPOKERGNAME \
-  -n 'CosmosDb-ZoneGroup' \
+  --resource-group $SPOKERGNAME \
+  --name 'CosmosDb-ZoneGroup' \
   --endpoint-name 'cosmosdbPvtEndpoint' \
   --private-dns-zone 'privatelink.mongodb.azure.com' \
   --zone-name 'CosmosDB'
@@ -365,28 +523,28 @@ az keyvault update -n $KV_NAME -g $SPOKERGNAME --default-action deny # Turn on K
 KEYVAULT_ID=$(az keyvault show -n $KV_NAME -g $SPOKERGNAME --query 'id' -o tsv)
 
 az network private-dns zone create \
-  -g $SPOKERGNAME \
-  -n 'privatelink.vaultcore.azure.net'
+  --resource-group $SPOKERGNAME \
+  --name 'privatelink.vaultcore.azure.net'
 
 az network private-dns link vnet create \
-  -g $SPOKERGNAME \
-  -n 'KeyVaultDNSLink' \
+  --resource-group $SPOKERGNAME \
+  --name 'KeyVaultDNSLink' \
   --zone-name 'privatelink.vaultcore.azure.net' \
   --virtual-network $HUB_VNET_ID \
   --registration-enabled true
 
 az network private-endpoint create \
-  -n 'kvPvtEndpoint' \
-  -g $SPOKERGNAME \
+  --name 'kvPvtEndpoint' \
+  --resource-group $SPOKERGNAME \
   --vnet-name $SPOKEVNET_NAME \
-  --subnet 'PrivateEndpoint-subnet' \
+  --subnet $PRIVATEENDPOINTSUBNET_NAME \
   --private-connection-resource-id $KEYVAULT_ID \
   --group-ids 'vault' \
   --connection-name 'kvConnection'
 
 az network private-endpoint dns-zone-group create \
-  -n 'KeyVault-ZoneGroup' \
-  -g $SPOKERGNAME \
+  --name 'KeyVault-ZoneGroup' \
+  --resource-group $SPOKERGNAME \
   --endpoint-name 'kvPvtEndpoint' \
   --private-dns-zone 'privatelink.vaultcore.azure.net' \
   --zone-name 'KEYVAULT'
@@ -396,8 +554,8 @@ az aro create \
   --resource-group $SPOKERGNAME \
   --name $AROCLUSTER \
   --vnet $SPOKEVNET_NAME \
-  --master-subnet master-aro-subnet \
-  --worker-subnet worker-aro-subnet \
+  --master-subnet $MASTERAROSUBNET_NAME \
+  --worker-subnet $WORKERAROSUBNET_NAME \
   --apiserver-visibility Private \
   --ingress-visibility Private \
   --pull-secret $PULLSECRETLOCATION
@@ -406,34 +564,37 @@ az aro create \
 # 12. Create Azure Front Door
 aro_rgName='aro-'$(az aro show -n $AROCLUSTER -g $SPOKERGNAME --query "clusterProfile.domain" -o tsv)
 internal_LbName=$(az network lb list --resource-group $aro_rgName --query "[? contains(name, 'internal')].name" -o tsv)
-worker_subnetId=$(az network vnet subnet show -n worker-aro-subnet -g $SPOKERGNAME --vnet-name $SPOKEVNET_NAME --query "id" -o tsv)
+worker_subnetId=$(az network vnet subnet show -n $WORKERAROSUBNET_NAME -g $SPOKERGNAME --vnet-name $SPOKEVNET_NAME --query "id" -o tsv)
 lbconfig_id=$(az network lb frontend-ip list -g $aro_rgName --lb-name $internal_LbName --query "[? contains(subnet.id, 'worker')].id" -o tsv)
 lbconfig_ip=$(az network lb frontend-ip list -g $aro_rgName --lb-name $internal_LbName --query "[? contains(subnet.id, 'worker')].privateIpAddress" -o tsv)
 
 az network private-link-service create \
-  -n 'ftaaro-pls' \
-  -g $SPOKERGNAME \
+  --name 'ftaaro-pls' \
+  --resource-group $SPOKERGNAME \
   --private-ip-address-version IPv4 \
   --private-ip-allocation-method Dynamic \
   --vnet-name $SPOKEVNET_NAME \
-  --subnet worker-aro-subnet \
+  --subnet $WORKERAROSUBNET_NAME \
   --lb-frontend-ip-configs $lbconfig_id
 
 privatelink_id=$(az network private-link-service show -n 'ftaaro-pls' -g $SPOKERGNAME --query 'id' -o tsv)
 
-az afd profile create -g $SPOKERGNAME --profile-name $AFD_NAME --sku Premium_AzureFrontDoor
+az afd profile create \
+  --resource-group $SPOKERGNAME \
+  --profile-name $AFD_NAME \
+  --sku Premium_AzureFrontDoor
 
 afd_id=$(az afd profile show -g $SPOKERGNAME --profile-name $AFD_NAME --query 'id' -o tsv)
 
 az monitor diagnostic-settings create \
-  -n 'AfdtoLogAnalytics' \
+  --name 'AfdtoLogAnalytics' \
   --resource $afd_id \
   --workspace $azlaworkspaceId \
   --logs '[{"category":"FrontDoorAccessLog","Enabled":true}, {"category":"FrontDoorHealthProbeLog","Enabled":true}, {"category":"FrontDoorWebApplicationFirewallLog","Enabled":true}]' \
   --metrics '[{"category": "AllMetrics","enabled": true}]'
 
 az afd endpoint create \
-  -g $SPOKERGNAME \
+  --resource-group $SPOKERGNAME \
   --origin-response-timeout-seconds 60 \
   --enabled-state Enabled \
   --endpoint-name 'aro-ilb' \
@@ -469,6 +630,28 @@ az afd origin create \
   --profile-name $AFD_NAME \
   --resource-group $SPOKERGNAME
 
+az afd custom-domain create \
+  --certificate-type ManagedCertificate \
+  --custom-domain-name ratingsapp-vwsazure-com \
+  --host-name ratingsapp.vwsazure.com \
+  --minimum-tls-version TLS12 \
+  --profile-name $AFD_NAME \
+  --resource-group $SPOKERGNAME
+
+az afd custom-domain wait \
+--resource-group $SPOKERGNAME \
+--profile-name $AFD_NAME \
+--custom-domain-name ratingsapp-vwsazure-com \
+--created
+
+az afd custom-domain show \
+  --resource-group $SPOKERGNAME \
+  --profile-name profile \
+  --custom-domain-name 'ratingsapp-vwsazure-com' \
+  --query "validationProperties"
+
+# Now you have validate your domain. You must create a TXT Record using this name: _dnsauth.ratingsapp.vwsazure.com usgin validationToken as value. This process will take some time to finish the verification.
+
 az afd route create \
   --endpoint-name 'aro-ilb' \
   --forwarding-protocol HttpOnly \
@@ -479,7 +662,7 @@ az afd route create \
   --route-name 'aro-route' \
   --supported-protocols Http Https \
   --patterns-to-match '/*' \
-  --link-to-default-domain Enabled
+  --custom-domains ratingsapp-vwsazure-com
 
 # 13. Connect to ARO cluster
 AROCLUSTERPWD=$(az aro list-credentials --name $AROCLUSTER --resource-group $SPOKERGNAME --query 'kubeadminPassword' -o tsv)
