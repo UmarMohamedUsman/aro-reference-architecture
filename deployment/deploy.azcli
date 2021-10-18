@@ -693,6 +693,56 @@ oc login $apiServer -u kubeadmin -p $AROCLUSTERPWD
 # 17. To display all namespaces
 oc get ns
 
+# 18. Integrate ACR with OC
+ACRPWD=$(az acr credential show -n $ACR_NAME --query 'passwords[0].value' -o tsv)
+
+oc create secret docker-registry \
+    --docker-server=$ACR_NAME.azurecr.io \
+    --docker-username=$ACR_NAME \
+    --docker-password=$ACRPWD \
+    --docker-email=unused \
+    acr-secret
+
+# 19. Integrate keyvault
+helm repo add csi-secrets-store-provider-azure https://raw.githubusercontent.com/Azure/secrets-store-csi-driver-provider-azure/master/charts
+helm install csi csi-secrets-store-provider-azure/csi-secrets-store-provider-azure
+
+# Create a service principal to access keyvault
+export SERVICE_PRINCIPAL_CLIENT_SECRET="$(az ad sp create-for-rbac --skip-assignment --name http://secrets-store-test --query 'password' -otsv)"
+export SERVICE_PRINCIPAL_CLIENT_ID="$(az ad sp show --id http://secrets-store-test --query 'appId' -otsv)"
+
+az keyvault set-policy -n $KV_NAME --secret-permissions get --spn ${SERVICE_PRINCIPAL_CLIENT_ID}
+
+# Create OC Secret
+oc create secret generic secrets-store-creds --from-literal clientid=${SERVICE_PRINCIPAL_CLIENT_ID} --from-literal clientsecret=${SERVICE_PRINCIPAL_CLIENT_SECRET}
+oc label secret secrets-store-creds secrets-store.csi.k8s.io/used=true
+
+# Deploy Secret Provider Class
+TENANT_ID=$(az account show --query tenantId -o tsv)
+
+cat <<EOF | kubectl apply -f -
+apiVersion: secrets-store.csi.x-k8s.io/v1alpha1
+kind: SecretProviderClass
+metadata:
+  name: azure-kvname
+  namespace: default
+spec:
+  provider: azure
+  parameters:
+    usePodIdentity: "false"
+    useVMManagedIdentity: "false"
+    userAssignedIdentityID: ""
+    keyvaultName: "${KV_NAME}"
+    objects: |
+      array:
+        - |
+          objectName: secret1
+          objectType: secret
+          objectVersion: ""
+    tenantId: "${TENANT_ID}"
+EOF
+
+
 # ***** AAD Integration Begin ***********
 # AAD Integration for RBAC: https://docs.microsoft.com/en-us/azure/openshift/configure-azure-ad-cli
 domain=$(az aro show -g $SPOKERGNAME -n $AROCLUSTER --query clusterProfile.domain -o tsv)
