@@ -10,7 +10,7 @@ Goal of this hackathon project is to come up with Reference Architecture/Referen
 
 - Private ARO cluster deployed across AZs
 - Integrate with Azure AD for RBAC
-- Application Gateway + WAF for ingress/firewall
+- Azure Front Door + Web Application Firewall with Private Link Service to connect private IP address in ARO
 - Azure Firewall for securing outbound traffic
 - Azure Container Registry for storing container images in geo-replicated manner
 - Azure Key Vault for storing secretes/certificates in a centralized manner
