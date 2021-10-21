@@ -720,7 +720,10 @@ oc label secret secrets-store-creds secrets-store.csi.k8s.io/used=true
 
 # Create Keyvault Secret
 # Get the Connection string for cosmos db and replace $COSMOSDB_URI_CONNECTIONSTRING
-COSMOSDB_URI_CONNECTIONSTRING=''
+cosmosKey=$(az cosmosdb keys list -n $COSMOSDB_NAME -g $SPOKERGNAME --query "primaryMasterKey" -o tsv)
+
+COSMOSDB_URI_CONNECTIONSTRING="mongodb://$COSMOSDB_NAME:$cosmosKey@$COSMOSDB_NAME.mongo.cosmos.azure.com:10255/ratingsdb?ssl=true&replicaSet=globaldb&retrywrites=false&appName=@$COSMOSDB_NAME@"
+
 az keyvault secret set --vault-name ${KV_NAME} --name 'mongodburi' --value $COSMOSDB_URI_CONNECTIONSTRING
 
 # Deploy Secret Provider Class
