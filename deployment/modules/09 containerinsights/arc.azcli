@@ -1,0 +1,8 @@
+# Add a policy to enable arc
+oc adm policy add-scc-to-user privileged system:serviceaccount:azure-arc:azure-arc-kube-aad-proxy-sa
+
+# Enable arc
+az connectedk8s connect --name $AROCLUSTER --resource-group $SPOKERGNAME --location $LOCATION
+
+# Verify
+az connectedk8s list --resource-group $SPOKERGNAME --output table

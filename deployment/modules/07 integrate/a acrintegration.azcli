@@ -1,0 +1,22 @@
+# Connect to ARO cluster
+AROCLUSTERPWD=$(az aro list-credentials --name $AROCLUSTER --resource-group $SPOKERGNAME --query 'kubeadminPassword' -o tsv)
+
+# Azure Login
+az login
+az account set -s $SUBSCRIPTIONID
+
+# Connect using the OpenShift CLI
+apiServer=$(az aro show -g $SPOKERGNAME -n $AROCLUSTER --query apiserverProfile.url -o tsv)
+
+# Login to the OpenShift cluster's API server
+oc login $apiServer -u kubeadmin -p $AROCLUSTERPWD
+
+# 18. Integrate ACR with OC (assuming workload image in 'ratingsapp' namespace)
+ACRPWD=$(az acr credential show -n $ACR_NAME --query 'passwords[0].value' -o tsv)
+
+oc create secret docker-registry \
+    --docker-server=$ACR_NAME.azurecr.io \
+    --docker-username=$ACR_NAME \
+    --docker-password=$ACRPWD \
+    --docker-email=unused \
+    acr-secret -n ratingsapp

@@ -1,0 +1,56 @@
+# Create csi namespace
+oc create ns csi
+
+# 19. Integrate keyvault
+helm repo add csi-secrets-store-provider-azure https://raw.githubusercontent.com/Azure/secrets-store-csi-driver-provider-azure/master/charts
+helm install csi csi-secrets-store-provider-azure/csi-secrets-store-provider-azure -n csi
+
+# Create a service principal to access keyvault
+SERVICE_PRINCIPAL_NAME="http://fta-aro-akv-sp"
+SERVICE_PRINCIPAL_CLIENT_SECRET="$(az ad sp create-for-rbac --skip-assignment --appId $SERVICE_PRINCIPAL_NAME --query 'password' -otsv)"
+SERVICE_PRINCIPAL_CLIENT_ID="$(az ad sp show --id $SERVICE_PRINCIPAL_NAME --query 'appId' -otsv)"
+
+az keyvault set-policy -n $KV_NAME --secret-permissions get --spn ${SERVICE_PRINCIPAL_CLIENT_ID}
+
+# Create OC Secret
+oc create secret generic secrets-store-creds --from-literal clientid=${SERVICE_PRINCIPAL_CLIENT_ID} --from-literal clientsecret=${SERVICE_PRINCIPAL_CLIENT_SECRET}
+oc label secret secrets-store-creds secrets-store.csi.k8s.io/used=true
+
+# Create Keyvault Secret
+# Get the Connection string for cosmos db and replace $COSMOSDB_URI_CONNECTIONSTRING
+cosmosKey=$(az cosmosdb keys list -n $COSMOSDB_NAME -g $SPOKERGNAME --query "primaryMasterKey" -o tsv)
+
+COSMOSDB_URI_CONNECTIONSTRING="mongodb://$COSMOSDB_NAME:$cosmosKey@$COSMOSDB_NAME.mongo.cosmos.azure.com:10255/ratingsdb?ssl=true&replicaSet=globaldb&retrywrites=false&appName=@$COSMOSDB_NAME@"
+
+az keyvault secret set --vault-name ${KV_NAME} --name 'mongodburi' --value $COSMOSDB_URI_CONNECTIONSTRING
+
+# Deploy Secret Provider Class
+TENANT_ID=$(az account show --query tenantId -o tsv)
+
+cat <<EOF | oc apply -f -
+apiVersion: secrets-store.csi.x-k8s.io/v1alpha1
+kind: SecretProviderClass
+metadata:
+  name: mongo-secret-csi
+  namespace: ratingsapp
+spec:
+  provider: azure
+  secretObjects:
+    - secretName: mongodburi
+      type: Opaque
+      data:
+      - objectName: MONGODBURI
+        key: MONGODBURI
+  parameters:
+    keyvaultName: "${KV_NAME}"
+    usePodIdentity: "false"
+    useVMManagedIdentity: "false"
+    userAssignedIdentityID: ""
+    cloudName: ""
+    objects: |
+      array:
+        - |
+          objectName: MONGODBURI
+          objectType: secret
+          objectVersion: ""
+    tenantId: "${TENANT_ID}"

@@ -14,12 +14,12 @@ spec:
       secretName: aks-tls-akv
   rules:
   - host: <fqdn>
-    http:  
+    http:
       paths:
       - pathType: Prefix
         path: /
         backend:
           service:
             name: ratings-web
-            port: 
+            port:
               number: 80

@@ -1,0 +1,38 @@
+# Deploy workload on toolsbox for testing
+git clone https://github.com/MicrosoftDocs/mslearn-aks-workshop-ratings-api.git
+
+git clone https://github.com/MicrosoftDocs/mslearn-aks-workshop-ratings-web.git
+
+sudo az acr login -n $ACR_NAME
+
+cd mslearn-aks-workshop-ratings-api
+sudo docker build . -t "$ACR_NAME.azurecr.io/ratings-api:v1"
+sudo docker push "$ACR_NAME.azurecr.io/ratings-api:v1"
+cd ..
+
+cd mslearn-aks-workshop-ratings-web
+sudo docker build . -t "$ACR_NAME.azurecr.io/ratings-web:v1"
+sudo docker push "$ACR_NAME.azurecr.io/ratings-web:v1"
+
+# Create app namespace
+oc create namespace ratingsapp
+
+# Navigate to RatingsApp folder and make necessary changes
+# Deploy API
+oc apply -f 1-ratings-api-deployment.yaml -n ratingsapp
+
+# Verify API app is running
+oc describe pod <pod name> -n ratingsapp
+oc logs <pod name> -n ratingsapp
+
+# Deploy api service
+oc apply -f 2-ratings-api-service.yaml -n ratingsapp
+
+# Deploy web frontend
+oc apply -f 3a-ratings-web-deployment.yaml -n ratingsapp
+
+# Deploy frontend service
+oc apply -f 4-ratings-web-service.yaml -n ratingsapp
+
+# Deploy Ingress
+oc apply -f 5-http-ratings-web-ingress.yaml -n ratingsapp

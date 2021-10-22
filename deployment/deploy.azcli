@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 SUBSCRIPTIONID='025f66df-d5dd-4a8c-a567-52f157cb8041'
 HUBRGNAME='hub-rg'
 SPOKERGNAME='spoke-rg'
@@ -18,7 +17,6 @@ AFD_NAME='ftahackafd'
 AFD_PLS_NAME='ftaaro-pls'
 AFD_APP_CUSTOM_DOMAIN_NAME='ratingsapp-vwsazure-com'
 ARO_APP_FQDN='ratingsapp.vwsazure.com'
-
 
 # VNet Name and IP Addresses
 HUBVNET_NAME='hub-vnet'
