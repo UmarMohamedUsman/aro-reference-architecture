@@ -1,7 +1,4 @@
 # Azure CosmosDB with Private Link
-databaseName='database1'
-collectionName='collection1'
-
 az cosmosdb create \
   --name $COSMOSDB_NAME \
   --resource-group $SPOKERGNAME \
@@ -9,44 +6,6 @@ az cosmosdb create \
   --server-version '4.0' \
   --enable-public-network false \
   --default-consistency-level Eventual
-
-# Create a MongoDB API database
-az cosmosdb mongodb database create \
-  --account-name $COSMOSDB_NAME \
-  --resource-group $SPOKERGNAME \
-  --name $databaseName
-
-# Define the index policy for the collection, with _id, wildcard, compound, unique and TTL
-printf '
-[
-    {
-        "key": {"keys": ["_id"]}
-    },
-    {
-        "key": {"keys": ["$**"]}
-    },
-    {
-        "key": {"keys": ["user_id", "user_address"]},
-        "options": {"unique": "true"}
-    },
-    {
-        "key": {"keys": ["_ts"]},
-        "options": {"expireAfterSeconds": 2629746}
-    }
-]' > idxpolicy-$uniqueId.json
-
-# Create a MongoDB API collection
-az cosmosdb mongodb collection create \
-  --account-name $COSMOSDB_NAME \
-  --resource-group $SPOKERGNAME \
-  --database-name $databaseName \
-  --name $collectionName \
-  --shard 'user_id' \
-  --throughput 400 \
-  --idx @idxpolicy-$uniqueId.json
-
-# Clean up temporary index policy file
-rm -f "idxpolicy-$uniqueId.json"
 
 COSMOSDB_ID=$(az cosmosdb show -n $COSMOSDB_NAME -g $SPOKERGNAME --query 'id' -o tsv)
 
@@ -57,7 +16,7 @@ az network private-endpoint create \
   --vnet-name $SPOKEVNET_NAME \
   --subnet $PRIVATEENDPOINTSUBNET_NAME \
   --private-connection-resource-id $COSMOSDB_ID \
-  --group-ids 'MongoDB' \
+  --group-id 'MongoDB' \
   --connection-name 'cosmosdbConnection'
 
 az network private-dns zone create \

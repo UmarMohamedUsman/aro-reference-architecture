@@ -1,4 +1,4 @@
-# 10.1 ACR in Spoke VNET with Private Endpoint
+# ACR in Spoke VNET with Private Endpoint
 az acr create \
   --resource-group $SPOKERGNAME \
   --name $ACR_NAME \
@@ -25,7 +25,7 @@ az network private-endpoint create \
   --vnet-name $SPOKEVNET_NAME \
   --subnet $PRIVATEENDPOINTSUBNET_NAME \
   --private-connection-resource-id $REGISTRY_ID \
-  --group-ids 'registry' \
+  --group-id 'registry' \
   --connection-name 'acrConnection'
 
 az network private-endpoint dns-zone-group create \

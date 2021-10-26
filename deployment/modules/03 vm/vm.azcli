@@ -11,7 +11,7 @@ az network bastion create \
   --vnet-name $HUBVNET_NAME \
   --location $LOCATION
 
-# Tools Box (for troubleshooting)
+# Tools Box (for troubleshooting. Best practice to remove public IP address)
 az vm create \
   --name 'ToolsBox' \
   --resource-group $HUBRGNAME \
@@ -27,4 +27,4 @@ az vm run-command invoke \
   --resource-group $HUBRGNAME \
   --name 'ToolsBox' \
   --command-id RunShellScript \
-  --scripts "curl -sL https://raw.githubusercontent.com/UmarMohamedUsman/aro-reference-architecture/welasco/deployment/script.sh | sudo bash"
+  --scripts "curl -sL https://raw.githubusercontent.com/UmarMohamedUsman/aro-reference-architecture/main/deployment/script.sh | sudo bash"

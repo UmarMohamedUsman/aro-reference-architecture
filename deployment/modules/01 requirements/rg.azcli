@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-SUBSCRIPTIONID='025f66df-d5dd-4a8c-a567-52f157cb8041'
+SUBSCRIPTIONID='12bb4e89-4f7a-41e0-a38f-b22f079248b4'
 HUBRGNAME='hub-rg'
 SPOKERGNAME='spoke-rg'
 ARCRGNAME='arc-rg'
 AZFW_NAME='azfw'
 BASTION_NAME='bastion-hub'
 LOCATION='eastus'
-AROCLUSTER='ftaarocluster'
-PULLSECRETLOCATION=@/mnt/c/Users/umarm/Downloads/pull-secret.txt
+AROCLUSTER='srarocluster'
+PULLSECRETLOCATION=@/Users/ssarwa/code/gb-hackathon/pull-secret.txt
 uniqueId=$RANDOM
-ACR_NAME='aroacr-'$uniqueId
-COSMOSDB_NAME='cosmos-'$uniqueId
-KV_NAME='keyvault-'$uniqueId
-LAWORKSPACE_NAME='ftahacklw'
-AFD_NAME='ftahackafd'
-AFD_PLS_NAME='ftaaro-pls'
-AFD_APP_CUSTOM_DOMAIN_NAME='ratingsapp-vwsazure-com'
-ARO_APP_FQDN='ratingsapp.vwsazure.com'
+ACR_NAME='aroacr'$uniqueId
+COSMOSDB_NAME='cosmos'$uniqueId
+KV_NAME='keyvault'$uniqueId
+LAWORKSPACE_NAME='srarolw'
+AFD_NAME='sraroafd'
+AFD_PLS_NAME='sraro-pls'
+AFD_APP_CUSTOM_DOMAIN_NAME='ratingsapp-sarwascloud-com'
+ARO_APP_FQDN='ratingsapp.sarwascloud.com'
 
 # VNet Name and IP Addresses
 HUBVNET_NAME='hub-vnet'
@@ -57,5 +57,5 @@ az provider register -n Microsoft.Authorization --wait
 # Log Analytics Workspace
 az monitor log-analytics workspace create \
   --resource-group $HUBRGNAME \
-  --name $LAWORKSPACE_NAME
+  -n $LAWORKSPACE_NAME
 azlaworkspaceId=$(az monitor log-analytics workspace show -g $HUBRGNAME -n $LAWORKSPACE_NAME --query 'id' -o tsv)

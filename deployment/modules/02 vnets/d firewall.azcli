@@ -1,6 +1,6 @@
-# 5. Create Azure Firewall
+# Create Azure Firewall
 # AZFW_NAME
-az network public-ip create
+az network public-ip create \
   --resource-group $HUBRGNAME \
   --name $AZFW_NAME'-pip' \
   --sku standard \
@@ -30,12 +30,11 @@ az network firewall update \
 
 azfw_private_ip=$(az network firewall show -n $AZFW_NAME -g $HUBRGNAME -o tsv --query 'ipConfigurations[0].privateIpAddress')
 
-# 5.1 Create Firewall Rules
-# 5.1.1 Create Network Rules
-aro_collection_network_rule_name='Aro-required-ports'
+# Create Firewall Rules
+# Create Network Rules
 az network firewall network-rule create \
   --firewall-name $AZFW_NAME -g $HUBRGNAME \
-  --collection-name $aro_collection_network_rule_name \
+  --collection-name 'Aro-required-ports' \
   --protocols any \
   --destination-addresses '*' \
   --destination-ports 123 \
@@ -44,7 +43,7 @@ az network firewall network-rule create \
   --priority 200 \
   --action Allow
 
-# 5.1.2 Create Application Rules
+# Create Application Rules
 # Minimum Required FQDN / application rules
 minimum_required_group_target_fqdns="arosvc.$LOCATION.data.azurecr.io *.quay.io registry.redhat.io mirror.openshift.com api.openshift.com arosvc.azurecr.io management.azure.com login.microsoftonline.com gcs.prod.monitoring.core.windows.net *.blob.core.windows.net *.servicebus.windows.net *.table.core.windows.net"
 az network firewall application-rule create \
@@ -59,12 +58,11 @@ az network firewall application-rule create \
   --action Allow
 
 # FIRST GROUP: INSTALLING AND DOWNLOADING PACKAGES AND TOOLS
-aro_collection_app_rule_name='Aro-required-urls'
 first_group_target_fqdns="quay.io registry.redhat.io sso.redhat.com openshift.org"
 az network firewall application-rule create \
   --firewall-name $AZFW_NAME \
   --resource-group $HUBRGNAME \
-  --collection-name $aro_collection_app_rule_name \
+  --collection-name 'Aro-required-urls' \
   --protocols Http=80 Https=443 \
   --target-fqdns $first_group_target_fqdns \
   --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX \
@@ -170,14 +168,14 @@ az network firewall application-rule create \
 # target_registries_fqdns="$LOCATION.data.mcr.microsoft.com $acr_name.azurecr.io *.gcr.io gcr.io storage.googleapis.com *.docker.io quay.io *.quay.io *.cloudfront.net production.cloudflare.docker.com *.hcp.$location.cx.aks.containerservice.azure.us"
 # target_fqdns="grafana.net grafana.com stats.grafana.org github.com raw.githubusercontent.com security.ubuntu.com security.ubuntu.com packages.microsoft.com azure.archive.ubuntu.com security.ubuntu.com hack32003.vault.azure.net *.letsencrypt.org usage.projectcalico.org gov-prod-policy-data.trafficmanager.net vortex.data.microsoft.com"
 
-# 5.5 Add Diagnostic Settings
+# Add Diagnostic Settings
 az monitor diagnostic-settings create -n 'AzFWtoLogAnalytics' \
    --resource $azfw_id \
    --workspace $azlaworkspaceId \
-   --logs '[{\"category\":\"AzureFirewallApplicationRule\",\"Enabled\":true}, {\"category\":\"AzureFirewallNetworkRule\",\"Enabled\":true}, {\"category\":\"AzureFirewallDnsProxy\",\"Enabled\":true}]' \
-   --metrics '[{\"category\": \"AllMetrics\",\"enabled\": true}]'
+   --logs '[{"category":"AzureFirewallApplicationRule","Enabled":true}, {"category":"AzureFirewallNetworkRule","Enabled":true}, {"category":"AzureFirewallDnsProxy","Enabled":true}]' \
+   --metrics '[{"category": "AllMetrics","enabled": true}]'
 
-# 6. Update VNET DNS IP
+# Update VNET DNS IP
 az network vnet update \
   --resource-group $HUBRGNAME \
   --name $HUBVNET_NAME \

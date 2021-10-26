@@ -17,7 +17,8 @@ az network vnet subnet create \
   --resource-group $SPOKERGNAME \
   --vnet-name $SPOKEVNET_NAME \
   --name $WORKERAROSUBNET_NAME \
-  --address-prefixes $WORKERAROSUBNET_PREFIX
+  --address-prefixes $WORKERAROSUBNET_PREFIX \
+  --disable-private-link-service-network-policies true
 
 # AppGW-subnet
 az network vnet subnet create \
