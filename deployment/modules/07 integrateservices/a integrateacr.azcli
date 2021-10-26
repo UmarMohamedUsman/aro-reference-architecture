@@ -16,6 +16,8 @@ oc login $apiServer -u kubeadmin -p $AROCLUSTERPWD
 # Integrate ACR with OC (assuming workload image in 'ratingsapp' namespace)
 ACRPWD=$(az acr credential show -n $ACR_NAME --query 'passwords[0].value' -o tsv)
 
+oc create ns ratingsapp
+
 oc create secret docker-registry \
     --docker-server=$ACR_NAME.azurecr.io \
     --docker-username=$ACR_NAME \

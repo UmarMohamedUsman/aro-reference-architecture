@@ -7,14 +7,14 @@ helm install csi csi-secrets-store-provider-azure/csi-secrets-store-provider-azu
 
 # Create a service principal to access keyvault
 SERVICE_PRINCIPAL_NAME="http://fta-aro-akv-sp"
-SERVICE_PRINCIPAL_CLIENT_SECRET="$(az ad sp create-for-rbac --skip-assignment --appId $SERVICE_PRINCIPAL_NAME --query 'password' -otsv)"
-SERVICE_PRINCIPAL_CLIENT_ID="$(az ad sp show --id $SERVICE_PRINCIPAL_NAME --query 'appId' -otsv)"
+SERVICE_PRINCIPAL_CLIENT_SECRET="$(az ad sp create-for-rbac --skip-assignment --name $SERVICE_PRINCIPAL_NAME --query 'password' -o tsv)"
+SERVICE_PRINCIPAL_CLIENT_ID="$(az ad sp show --id $SERVICE_PRINCIPAL_NAME --query 'appId' -o tsv)"
 
 az keyvault set-policy -n $KV_NAME --secret-permissions get --spn ${SERVICE_PRINCIPAL_CLIENT_ID}
 
 # Create OC Secret
-oc create secret generic secrets-store-creds --from-literal clientid=${SERVICE_PRINCIPAL_CLIENT_ID} --from-literal clientsecret=${SERVICE_PRINCIPAL_CLIENT_SECRET}
-oc label secret secrets-store-creds secrets-store.csi.k8s.io/used=true
+oc create secret generic secrets-store-creds --from-literal clientid=${SERVICE_PRINCIPAL_CLIENT_ID} --from-literal clientsecret=${SERVICE_PRINCIPAL_CLIENT_SECRET} -n ratingsapp
+oc label secret secrets-store-creds secrets-store.csi.k8s.io/used=true -n ratingsapp
 
 # Create Keyvault Secret
 # Get the Connection string for cosmos db and replace $COSMOSDB_URI_CONNECTIONSTRING
@@ -54,3 +54,4 @@ spec:
           objectType: secret
           objectVersion: ""
     tenantId: "${TENANT_ID}"
+EOF
