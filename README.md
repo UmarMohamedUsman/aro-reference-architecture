@@ -14,6 +14,6 @@ Goal of this hackathon project is to come up with Reference Architecture/Referen
 - Azure Firewall for securing outbound traffic
 - Azure Container Registry for storing container images in geo-replicated manner
 - Azure Key Vault for storing secretes/certificates in a centralized manner
-- Connect ARO cluster to Azure Arc and install Container Insights extension for collecting logs through Log Analytics workspace
-- GitHub Actions with Private Runner for CI/CD
 - Azure Cosmos DB with private endpoint for application backend
+- Connect ARO cluster to Azure Arc and install Container Insights extension for collecting logs through Log Analytics workspace
+- Provision Azure Bastion Host & Azure VM to securely connect to ARO cluster and deploy a sample application manually
