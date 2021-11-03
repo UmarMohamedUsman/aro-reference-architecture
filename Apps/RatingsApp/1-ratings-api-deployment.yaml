@@ -54,3 +54,5 @@ spec:
             readOnly: true
             volumeAttributes:
               secretProviderClass: "mongo-secret-csi"
+            nodePublishSecretRef:                       # Only required when using service principal mode
+              name: secrets-store-creds

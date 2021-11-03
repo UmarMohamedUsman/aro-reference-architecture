@@ -20,7 +20,7 @@ az network private-endpoint create \
   --vnet-name $SPOKEVNET_NAME \
   --subnet $PRIVATEENDPOINTSUBNET_NAME \
   --private-connection-resource-id $KEYVAULT_ID \
-  --group-ids 'vault' \
+  --group-id 'vault' \
   --connection-name 'kvConnection'
 
 az network private-endpoint dns-zone-group create \

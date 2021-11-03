@@ -1,5 +1,5 @@
-# 7. Create UDRs
-# 7.1 UDR for ARO
+# Create UDRs
+# UDR for ARO
 ARO_UDR_NAME='aro-udr'
 az network route-table create \
   --name $ARO_UDR_NAME \
@@ -24,4 +24,4 @@ az network vnet subnet update \
   --name $WORKERAROSUBNET_NAME \
   --route-table $aro_rt_id
 
-# 7.2 TODO: UDR for VMs/Toolsbox and PrivateRunner
+# TODO: UDR for VMs/Toolsbox and PrivateRunner

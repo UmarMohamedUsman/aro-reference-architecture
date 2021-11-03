@@ -5,6 +5,7 @@ worker_subnetId=$(az network vnet subnet show -n $WORKERAROSUBNET_NAME -g $SPOKE
 lbconfig_id=$(az network lb frontend-ip list -g $aro_rgName --lb-name $internal_LbName --query "[? contains(subnet.id, 'worker')].id" -o tsv)
 lbconfig_ip=$(az network lb frontend-ip list -g $aro_rgName --lb-name $internal_LbName --query "[? contains(subnet.id, 'worker')].privateIpAddress" -o tsv)
 
+# Make sure worker subnet has private link service network policies disabled
 az network private-link-service create \
   --name $AFD_PLS_NAME \
   --resource-group $SPOKERGNAME \
@@ -34,7 +35,7 @@ az afd endpoint create \
   --resource-group $SPOKERGNAME \
   --origin-response-timeout-seconds 60 \
   --enabled-state Enabled \
-  --endpoint-name 'aro-ilb' \
+  --endpoint-name 'aro-ilb'$uniqueId \
   --profile-name $AFD_NAME
 
 az afd origin-group create \
@@ -62,10 +63,11 @@ az afd origin create \
   --origin-group-name 'afdorigin' \
   --enabled-state Enabled \
   --host-name $lbconfig_ip \
-  #--origin-host-header $ARO_APP_FQDN \
   --origin-name 'afdorigin' \
   --profile-name $AFD_NAME \
   --resource-group $SPOKERGNAME
+
+az afd origin show --origin-group-name 'afdorigin' --origin-name 'afdorigin' --profile-name $AFD_NAME --resource-group $SPOKERGNAME
 
 privatelink_pe_id=$(az network private-link-service show -n $AFD_PLS_NAME -g $SPOKERGNAME --query 'privateEndpointConnections[0].privateEndpoint.id' -o tsv)
 
@@ -89,12 +91,12 @@ az afd custom-domain show \
   --custom-domain-name $AFD_APP_CUSTOM_DOMAIN_NAME \
   --query "validationProperties"
 
-# Now you have validate your domain. You must create a TXT Record using this name: _dnsauth.ratingsapp.vwsazure.com usgin validationToken as value. This process will take some time to finish the verification.
+# Now you have validate your domain. You must create a TXT Record using this name: _dnsauth.ratingsapp.sarwascloud.com using validationToken as value. This process will take some time to finish the verification.
 # To check if the DNS was created in the expected run NSLOOKUP: nslookup -q=TXT _dnsauth.$ARO_APP_FQDN
-# This validarion process will take some time
+# This validation process will take some time
 
 az afd route create \
-  --endpoint-name 'aro-ilb' \
+  --endpoint-name 'aro-ilb'$uniqueId \
   --forwarding-protocol HttpOnly \
   --https-redirect Disabled \
   --origin-group 'afdorigin' \
