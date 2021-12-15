@@ -10,8 +10,9 @@ az network bastion create \
   --resource-group $HUBRGNAME \
   --vnet-name $HUBVNET_NAME \
   --location $LOCATION
+  --scale-units 2
 
-# Tools Box (for troubleshooting. Best practice to remove public IP address)
+# JumpBox (Optional, used for troubleshooting. Best practice to remove public IP address and connect using Bastion Host)
 az vm create \
   --name 'ToolsBox' \
   --resource-group $HUBRGNAME \
@@ -22,9 +23,28 @@ az vm create \
   --subnet $VMSUBNET_NAME \
   --generate-ssh-keys
 
-# Install tools in the Tools Box VM
+# Install tools in the JumpBox VM
 az vm run-command invoke \
   --resource-group $HUBRGNAME \
   --name 'ToolsBox' \
   --command-id RunShellScript \
   --scripts "curl -sL https://raw.githubusercontent.com/UmarMohamedUsman/aro-reference-architecture/main/deployment/script.sh | sudo bash"
+
+# JumpBox (Optional, used for troubleshooting and deploying sample application)
+# Best practice to remove public IP address and connect using Bastion Host)
+az vm create \
+  --name 'JumpBox' \
+  --resource-group $HUBRGNAME \
+  --image 'Win2022Datacenter' \
+  --admin-username 'azureuser' \
+  --size 'Standard_D2s_v3' \
+  --vnet-name $HUBVNET_NAME \
+  --subnet $VMSUBNET_NAME \
+
+# Install tools in the JumpBox VM
+az vm run-command invoke \
+  --resource-group $HUBRGNAME \
+  --name 'ToolsBox' \
+  --command-id RunPowerShellScript \
+  --scripts "https://raw.githubusercontent.com/UmarMohamedUsman/aro-reference-architecture/main/deployment/script.ps1"
+
