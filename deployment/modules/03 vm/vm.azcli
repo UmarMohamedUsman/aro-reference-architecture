@@ -13,22 +13,22 @@ az network bastion create \
   --scale-units 2
 
 # JumpBox (Optional, used for troubleshooting. Best practice to remove public IP address and connect using Bastion Host)
-az vm create \
-  --name 'ToolsBox' \
-  --resource-group $HUBRGNAME \
-  --image UbuntuLTS \
-  --admin-username 'azureuser' \
-  --size 'Standard_A2' \
-  --vnet-name $HUBVNET_NAME \
-  --subnet $VMSUBNET_NAME \
-  --generate-ssh-keys
+# az vm create \
+#   --name 'ToolsBox' \
+#   --resource-group $HUBRGNAME \
+#   --image UbuntuLTS \
+#   --admin-username 'azureuser' \
+#   --size 'Standard_A2' \
+#   --vnet-name $HUBVNET_NAME \
+#   --subnet $VMSUBNET_NAME \
+#   --generate-ssh-keys
 
-# Install tools in the JumpBox VM
-az vm run-command invoke \
-  --resource-group $HUBRGNAME \
-  --name 'ToolsBox' \
-  --command-id RunShellScript \
-  --scripts "curl -sL https://raw.githubusercontent.com/UmarMohamedUsman/aro-reference-architecture/main/deployment/script.sh | sudo bash"
+# # Install tools in the JumpBox VM
+# az vm run-command invoke \
+#   --resource-group $HUBRGNAME \
+#   --name 'ToolsBox' \
+#   --command-id RunShellScript \
+#   --scripts "curl -sL https://raw.githubusercontent.com/UmarMohamedUsman/aro-reference-architecture/main/deployment/script.sh | sudo bash"
 
 # JumpBox (Optional, used for troubleshooting and deploying sample application)
 # Best practice to remove public IP address and connect using Bastion Host)
