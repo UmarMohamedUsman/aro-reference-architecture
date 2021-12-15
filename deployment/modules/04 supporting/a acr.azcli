@@ -6,6 +6,18 @@ az acr create \
   --public-network-enabled false \
   --admin-enabled true
 
+REGISTRY_ID=$(az acr show -n $ACR_NAME --query 'id' -o tsv)
+
+# Private Endpoint connection
+az network private-endpoint create \
+  --name 'acrPvtEndpoint' \
+  --resource-group $SPOKERGNAME \
+  --vnet-name $SPOKEVNET_NAME \
+  --subnet $PRIVATEENDPOINTSUBNET_NAME \
+  --private-connection-resource-id $REGISTRY_ID \
+  --group-id 'registry' \
+  --connection-name 'acrConnection'
+
 az network private-dns zone create \
   --resource-group $SPOKERGNAME \
   --name 'privatelink.azurecr.io'
@@ -16,17 +28,6 @@ az network private-dns link vnet create \
   --zone-name 'privatelink.azurecr.io' \
   --virtual-network $HUB_VNET_ID \
   --registration-enabled false
-
-REGISTRY_ID=$(az acr show -n $ACR_NAME --query 'id' -o tsv)
-
-az network private-endpoint create \
-  --name 'acrPvtEndpoint' \
-  --resource-group $SPOKERGNAME \
-  --vnet-name $SPOKEVNET_NAME \
-  --subnet $PRIVATEENDPOINTSUBNET_NAME \
-  --private-connection-resource-id $REGISTRY_ID \
-  --group-id 'registry' \
-  --connection-name 'acrConnection'
 
 az network private-endpoint dns-zone-group create \
   --name 'ACR-ZoneGroup' \
