@@ -328,8 +328,8 @@ az network firewall application-rule create \
 az monitor diagnostic-settings create -n 'AzFWtoLogAnalytics' \
    --resource $azfw_id \
    --workspace $azlaworkspaceId \
-   --logs '[{\"category\":\"AzureFirewallApplicationRule\",\"Enabled\":true}, {\"category\":\"AzureFirewallNetworkRule\",\"Enabled\":true}, {\"category\":\"AzureFirewallDnsProxy\",\"Enabled\":true}]' \
-   --metrics '[{\"category\": \"AllMetrics\",\"enabled\": true}]'
+   --logs '[{"category": "AzureFirewallApplicationRule","enabled":true}, {"category":"AzureFirewallNetworkRule","enabled":true}, {"category":"AzureFirewallDnsProxy","enabled":true}]' \
+   --metrics '[{"category":"AllMetrics","enabled": true}]'
 
 # 6. Update VNET DNS IP
 az network vnet update \
@@ -380,7 +380,8 @@ az network bastion create \
   --public-ip-address $BASTION_NAME'-PIP' \
   --resource-group $HUBRGNAME \
   --vnet-name $HUBVNET_NAME \
-  --location $LOCATION
+  --location $LOCATION \
+  --scale-units 2
 
 # 9. Tools Box (for troubleshooting)
 az vm create \
