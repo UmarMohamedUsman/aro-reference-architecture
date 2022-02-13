@@ -5,6 +5,14 @@ Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile .\AzureCLI
 Start-Process msiexec.exe -Wait -ArgumentList '/I AzureCLI.msi /quiet'
 Remove-Item -Path .\AzureCLI.msi
 
+#############################
+#Install Git - https://git-scm.com/download/win
+#############################
+
+#############################
+#Install VS Code - https://code.visualstudio.com/Download
+#############################
+
 
 #############################
 #Install Docker - https://docs.docker.com/desktop/windows/install/#install-docker-desktop-on-windows
