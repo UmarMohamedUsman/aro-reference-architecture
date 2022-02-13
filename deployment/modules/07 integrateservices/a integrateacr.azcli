@@ -1,4 +1,5 @@
 # The below steps must be done from JumpBox VM
+# Note: Make sure to clone the repo on the JumpBox VM
 
 # Connect to ARO cluster
 AROCLUSTERPWD=$(az aro list-credentials --name $AROCLUSTER --resource-group $SPOKERGNAME --query 'kubeadminPassword' -o tsv)
