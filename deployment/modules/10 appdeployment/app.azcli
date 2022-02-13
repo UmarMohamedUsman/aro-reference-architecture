@@ -1,4 +1,4 @@
-# Deploy workload on toolsbox for testing
+# Deploy workload on JumpBox VM for testing
 git clone https://github.com/MicrosoftDocs/mslearn-aks-workshop-ratings-api.git
 
 git clone https://github.com/MicrosoftDocs/mslearn-aks-workshop-ratings-web.git

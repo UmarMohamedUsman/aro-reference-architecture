@@ -1,22 +1,24 @@
+# Important: Tested these scripts only through WSL Terminal. Git Bash doesn't work.
+
 #!/usr/bin/env bash
-SUBSCRIPTIONID='12bb4e89-4f7a-41e0-a38f-b22f079248b4'
-HUBRGNAME='hub-rg'
-SPOKERGNAME='spoke-rg'
-ARCRGNAME='arc-rg'
+SUBSCRIPTIONID='025f66df-d5dd-4a8c-a567-52f157cb8041'
+HUBRGNAME='hub-aro-rg'
+SPOKERGNAME='spoke-aro-rg'
+ARCRGNAME='arc-aro-rg'
 AZFW_NAME='azfw'
 BASTION_NAME='bastion-hub'
 LOCATION='eastus'
-AROCLUSTER='srarocluster'
-PULLSECRETLOCATION=@/Users/ssarwa/code/gb-hackathon/pull-secret.txt
+AROCLUSTER='arocluster'
+PULLSECRETLOCATION=@/mnt/c/Users/umarm/Downloads/pull-secret.txt
 uniqueId=$RANDOM
 ACR_NAME='aroacr'$uniqueId
 COSMOSDB_NAME='cosmos'$uniqueId
 KV_NAME='keyvault'$uniqueId
-LAWORKSPACE_NAME='srarolw'
-AFD_NAME='sraroafd'
-AFD_PLS_NAME='sraro-pls'
-AFD_APP_CUSTOM_DOMAIN_NAME='ratingsapp-sarwascloud-com'
-ARO_APP_FQDN='ratingsapp.sarwascloud.com'
+LAWORKSPACE_NAME='arolw'
+AFD_NAME='aroafd'
+AFD_PLS_NAME='aro-pls'
+AFD_APP_CUSTOM_DOMAIN_NAME='ratingsapp-umar-cloud'
+ARO_APP_FQDN='ratingsapp.umar.cloud'
 
 # VNet Name and IP Addresses
 HUBVNET_NAME='hub-vnet'
