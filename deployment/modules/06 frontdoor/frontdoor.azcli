@@ -73,6 +73,10 @@ privatelink_pe_id=$(az network private-link-service show -n $AFD_PLS_NAME -g $SP
 
 # Currently there is a bug in Az CLI that is unable to approve a Private Endpoint in a Private Link Service
 # Bug Link: https://github.com/Azure/azure-cli/issues/19908
+# Following command expected to fail with 'child_name_1'
+# Check out: https://docs.microsoft.com/en-us/azure/frontdoor/standard-premium/concept-private-link
+# For now go through Portal, find Private Link Service (under spoke rg) in this case aro-pls, then go to 'Private endpoint connections', select the connection and Approve
+# Connection status should change from Pending to Approved
 az network private-endpoint-connection approve \
   --description 'Approved' \
   --id $privatelink_pe_id
@@ -91,7 +95,7 @@ az afd custom-domain show \
   --custom-domain-name $AFD_APP_CUSTOM_DOMAIN_NAME \
   --query "validationProperties"
 
-# Now you have validate your domain. You must create a TXT Record using this name: _dnsauth.ratingsapp.sarwascloud.com using validationToken as value. This process will take some time to finish the verification.
+# Now you have validate your domain. You must create a TXT Record using this name for example: _dnsauth.ratingsapp.umar.cloud using validationToken as value. This process will take some time to finish the verification.
 # To check if the DNS was created in the expected run NSLOOKUP: nslookup -q=TXT _dnsauth.$ARO_APP_FQDN
 # This validation process will take some time
 
