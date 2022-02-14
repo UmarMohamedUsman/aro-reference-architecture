@@ -1,12 +1,13 @@
-# The below steps must be done from JumpBox VM
+# Below steps must be done from JumpBox VM
 # Note: Make sure to clone the repo on the JumpBox VM
-
-# Connect to ARO cluster
-AROCLUSTERPWD=$(az aro list-credentials --name $AROCLUSTER --resource-group $SPOKERGNAME --query 'kubeadminPassword' -o tsv)
+# Use Git Bash Terminal on the JumpBox VM to execute code from Visual Studio Code
 
 # Azure Login
 az login
 az account set -s $SUBSCRIPTIONID
+
+# Connect to ARO cluster
+AROCLUSTERPWD=$(az aro list-credentials --name $AROCLUSTER --resource-group $SPOKERGNAME --query 'kubeadminPassword' -o tsv)
 
 # Connect using the OpenShift CLI
 apiServer=$(az aro show -g $SPOKERGNAME -n $AROCLUSTER --query apiserverProfile.url -o tsv)

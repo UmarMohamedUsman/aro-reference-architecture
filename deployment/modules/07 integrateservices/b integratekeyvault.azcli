@@ -1,7 +1,8 @@
+# Below steps must be done from JumpBox VM
 # Create csi namespace
 oc create ns csi
 
-# 19. Integrate keyvault
+# Integrate keyvault
 helm repo add csi-secrets-store-provider-azure https://raw.githubusercontent.com/Azure/secrets-store-csi-driver-provider-azure/master/charts
 helm install csi csi-secrets-store-provider-azure/csi-secrets-store-provider-azure -n csi
 
