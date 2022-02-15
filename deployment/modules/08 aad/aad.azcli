@@ -1,3 +1,5 @@
+# Below steps must be executed from JumpBox VM
+
 # AAD Integration for RBAC: https://docs.microsoft.com/en-us/azure/openshift/configure-azure-ad-cli
 domain=$(az aro show -g $SPOKERGNAME -n $AROCLUSTER --query clusterProfile.domain -o tsv)
 location=$(az aro show -g $SPOKERGNAME -n $AROCLUSTER --query location -o tsv)
@@ -88,6 +90,9 @@ EOF
 # Apply the configuration to the cluster.
 oc apply -f oidc.yaml
 
-# Add rolebinding to AAD user
+# Optional step to test sign in using AAD: Add cluster-admin rolebinding to one of the AAD user
 # Example: oc create clusterrolebinding umarm-cluster-admin-role --clusterrole=cluster-admin --user=umarm@microsoft.com
 oc create clusterrolebinding <alias-cluster-admin-role> --clusterrole=cluster-admin --user=<AAD User Principal Name>
+
+# Go to OpenShift Web Console, now you will see Log in option with AAD
+# Using AAD option, sign in with the user who we provided cluster-admin role in the previous step
