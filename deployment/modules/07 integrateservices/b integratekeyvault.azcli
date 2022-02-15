@@ -9,7 +9,7 @@ helm install csi csi-secrets-store-provider-azure/csi-secrets-store-provider-azu
 # Create a service principal to access keyvault
 SERVICE_PRINCIPAL_NAME="fta-aro-akv-sp"
 SERVICE_PRINCIPAL_CLIENT_SECRET="$(az ad sp create-for-rbac --skip-assignment --name $SERVICE_PRINCIPAL_NAME --query 'password' -o tsv)"
-SERVICE_PRINCIPAL_CLIENT_ID="$(az ad sp show --id $SERVICE_PRINCIPAL_NAME --query 'appId' -o tsv)"
+SERVICE_PRINCIPAL_CLIENT_ID="$(az ad sp list --display-name fta-aro-akv-sp --query [0].'appId' -o tsv)"
 
 az keyvault set-policy -n $KV_NAME --secret-permissions get --spn ${SERVICE_PRINCIPAL_CLIENT_ID}
 

@@ -95,7 +95,7 @@ az afd custom-domain show \
   --custom-domain-name $AFD_APP_CUSTOM_DOMAIN_NAME \
   --query "validationProperties"
 
-# Now you have validate your domain. You must create a TXT Record using this name for example: _dnsauth.ratingsapp.umar.cloud using validationToken as value. This process will take some time to finish the verification.
+# Now you have to validate your domain. You must create a TXT Record using this name for example: _dnsauth.ratingsapp.umar.cloud using validationToken as value.
 # To check if the DNS was created in the expected run NSLOOKUP: nslookup -q=TXT _dnsauth.$ARO_APP_FQDN
 # This validation process will take some time
 
@@ -110,3 +110,6 @@ az afd route create \
   --supported-protocols Http Https \
   --patterns-to-match '/*' \
   --custom-domains $AFD_APP_CUSTOM_DOMAIN_NAME
+
+# Create a CName record type in your DNS pointing ratingsapp to Azure Front Door endpoint
+# For example create ratingsapp.umar.cloud CNAME record pointing to aro-ilb6779.z01.azurefd.net
