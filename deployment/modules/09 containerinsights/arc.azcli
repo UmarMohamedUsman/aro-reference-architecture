@@ -4,6 +4,7 @@
 
 # Install the connectedk8s Azure CLI extension
 az extension add --name connectedk8s
+az extension add --name k8s-extension
 
 # Register providers for Azure Arc-enabled Kubernetes
 az provider register --namespace Microsoft.Kubernetes
