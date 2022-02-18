@@ -27,6 +27,9 @@ az connectedk8s connect --name $AROCLUSTER --resource-group $SPOKERGNAME --locat
 # Verify cluster connection
 az connectedk8s list --resource-group $SPOKERGNAME --output table
 
+# Check the deployment and pods
+oc get deployments,pods -n azure-arc
+
 # Create Azure Monitor Container Insights extension instance
 az k8s-extension create --name azuremonitor-containers \
     --cluster-name $AROCLUSTER \

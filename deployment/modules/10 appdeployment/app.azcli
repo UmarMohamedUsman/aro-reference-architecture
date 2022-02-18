@@ -1,16 +1,21 @@
+# Below steps must be executed from JumpBox VM
+# You can run these commands from Git Bash terminal but skip the sudo word
+
 # Deploy workload on JumpBox VM for testing
 git clone https://github.com/MicrosoftDocs/mslearn-aks-workshop-ratings-api.git
-
 git clone https://github.com/MicrosoftDocs/mslearn-aks-workshop-ratings-web.git
 
+# You should get Login Succeeded
 sudo az acr login -n $ACR_NAME
 
 cd mslearn-aks-workshop-ratings-api
+# If running from Git Bash terminal skip the sudo word
 sudo docker build . -t "$ACR_NAME.azurecr.io/ratings-api:v1"
 sudo docker push "$ACR_NAME.azurecr.io/ratings-api:v1"
 cd ..
 
 cd mslearn-aks-workshop-ratings-web
+# If running from Git Bash terminal skip the sudo word
 sudo docker build . -t "$ACR_NAME.azurecr.io/ratings-web:v1"
 sudo docker push "$ACR_NAME.azurecr.io/ratings-web:v1"
 
@@ -18,7 +23,11 @@ sudo docker push "$ACR_NAME.azurecr.io/ratings-web:v1"
 oc create namespace ratingsapp
 
 # Navigate to RatingsApp folder and make necessary changes
+ cd ..
+ cd aro-reference-architecture/Apps/RatingsApp/
+
 # Deploy API
+# Change the Azure Container Registry name in the following yaml file
 oc apply -f 1-ratings-api-deployment.yaml -n ratingsapp
 
 # Verify API app is running

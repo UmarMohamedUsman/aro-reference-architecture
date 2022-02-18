@@ -124,7 +124,7 @@ az network firewall application-rule create \
   --action Allow
 
 # SIXTH GROUP: ONBOARDING ARO ON TO ARC
-sixth_group_target_fqdns="management.azure.com $LOCATION.dp.kubernetesconfiguration.azure.com login.microsoftonline.com login.windows.net mcr.microsoft.com *.data.mcr.microsoft.com gbl.his.arc.azure.com *.his.arc.azure.com *.servicebus.windows.net guestnotificationservice.azure.com *.guestnotificationservice.azure.com sts.windows.net k8connecthelm.azureedge.net"
+sixth_group_target_fqdns="$LOCATION.login.microsoft.com management.azure.com $LOCATION.dp.kubernetesconfiguration.azure.com login.microsoftonline.com login.windows.net mcr.microsoft.com *.data.mcr.microsoft.com gbl.his.arc.azure.com *.his.arc.azure.com *.servicebus.windows.net guestnotificationservice.azure.com *.guestnotificationservice.azure.com sts.windows.net k8connecthelm.azureedge.net"
 az network firewall application-rule create \
   --firewall-name $AZFW_NAME \
   --resource-group $HUBRGNAME \
@@ -160,6 +160,19 @@ az network firewall application-rule create \
   --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX \
   --name eighth_group_target_fqdns \
   --priority 208 \
+  --action Allow
+
+# NINETH GROUP: Miscellaneous - Optional for testing porpuse
+nineth_group_target_fqdns="quayio-production-s3.s3.amazonaws.com"
+az network firewall application-rule create \
+  --firewall-name $AZFW_NAME \
+  --resource-group $HUBRGNAME \
+  --collection-name 'Miscellaneous-URLs' \
+  --protocols Http=80 Https=443 \
+  --target-fqdns $nineth_group_target_fqdns \
+  --source-addresses $HUBVNET_PREFIX $SPOKEVNET_PREFIX \
+  --name nineth_group_target_fqdns \
+  --priority 209 \
   --action Allow
 
 # Optional additional Azure FQDNs
