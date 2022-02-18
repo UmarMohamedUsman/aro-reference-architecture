@@ -56,3 +56,38 @@ spec:
           objectVersion: ""
     tenantId: "${TENANT_ID}"
 EOF
+
+
+# Optiona: Test by running busybox
+cat <<EOF | oc apply -f -
+kind: Pod
+apiVersion: v1
+metadata:
+  name: busybox-secrets-store-inline
+  namespace: ratingsapp
+spec:
+  containers:
+  - name: busybox
+    image: k8s.gcr.io/e2e-test-images/busybox:1.29
+    command:
+      - "/bin/sleep"
+      - "10000"
+    volumeMounts:
+    - name: secrets-store-inline
+      mountPath: "/mnt/secrets-store"
+      readOnly: true
+  volumes:
+    - name: secrets-store-inline
+      csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: "mongo-secret-csi"
+        nodePublishSecretRef:                       # Only required when using service principal mode
+          name: secrets-store-creds                 # Only required when using service principal mode
+EOF
+
+# Test the secrets
+oc exec busybox-secrets-store-inline -- ls /mnt/secrets-store/
+
+oc exec busybox-secrets-store-inline -- cat /mnt/secrets-store/mongodburi
