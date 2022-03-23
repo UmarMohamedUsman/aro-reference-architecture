@@ -26,6 +26,12 @@ oc create namespace ratingsapp
  cd ..
  cd aro-reference-architecture/Apps/RatingsApp/
 
+oc adm policy add-scc-to-user privileged \
+   system:serviceaccount:ratingsapp:secrets-store-csi-driver
+
+oc adm policy add-scc-to-user privileged \
+   system:serviceaccount:ratingsapp:csi-secrets-store-provider-azure
+
 # Deploy API
 # Change the Azure Container Registry name in the following yaml file
 oc apply -f 1-ratings-api-deployment.yaml -n ratingsapp
