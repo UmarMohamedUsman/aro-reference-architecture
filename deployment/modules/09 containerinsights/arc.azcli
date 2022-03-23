@@ -27,10 +27,11 @@ az connectedk8s connect --name $AROCLUSTER --resource-group $SPOKERGNAME --locat
 # Verify cluster connection
 az connectedk8s list --resource-group $SPOKERGNAME --output table
 
-# Check the deployment and pods
+# Check the deployment and pods. All deployment should be ready and all Pods should be in Ready and in Running state
 oc get deployments,pods -n azure-arc
 
 # Create Azure Monitor Container Insights extension instance
+# *** Following command will not work from Git Bash terminal (bug in Git Bash), run from WSL terminal (no need to be on Jumpbox to execute) ***
 az k8s-extension create --name azuremonitor-containers \
     --cluster-name $AROCLUSTER \
     --resource-group $SPOKERGNAME \
