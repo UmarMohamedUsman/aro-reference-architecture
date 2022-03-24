@@ -26,3 +26,5 @@ oc create secret docker-registry \
     --docker-password=$ACRPWD \
     --docker-email=unused \
     acr-secret -n ratingsapp
+
+oc secrets link default acr-secret --for=pull,mount
