@@ -5,13 +5,13 @@ metadata:
   name: ratingsapp-ingress
 spec:
   rules:
-  - host: <fqdn>
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: ratings-web
-            port:
-              number: 3000
+    - host: <fqdn>
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ratings-web
+                port:
+                  number: 80
