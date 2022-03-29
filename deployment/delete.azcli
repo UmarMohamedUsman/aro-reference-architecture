@@ -6,5 +6,5 @@ AROCLUSTER='ftaarocluster'
 az aro delete --resource-group $SPOKERGNAME --name $AROCLUSTER -y
 
 # 2. Delete Resource Groups
-az group delete -n $HUBRGNAME -y
 az group delete -n $SPOKERGNAME -y
+az group delete -n $HUBRGNAME -y
