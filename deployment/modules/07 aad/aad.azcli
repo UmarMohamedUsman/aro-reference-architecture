@@ -48,6 +48,9 @@ az ad app permission add \
  --api-permissions 311a71cc-e848-46a1-bdf8-97ff7156d8e6=Scope \
  --id $app_id
 
+# Connect using the OpenShift CLI
+apiServer=$(az aro show -g $SPOKERGNAME -n $AROCLUSTER --query apiserverProfile.url -o tsv)
+
 # Retrieve the kubeadmin credentials. Run the following command to find the password for the kubeadmin user.
 kubeadmin_password=$(az aro list-credentials --name $AROCLUSTER --resource-group $SPOKERGNAME --query kubeadminPassword --output tsv)
 
